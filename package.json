@@ -1,0 +1,43 @@
+{
+  "name": "ai-agents-orchestrator",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start --port 3001",
+    "lint": "next lint",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:push": "prisma db push"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@prisma/client": "^6.5.0",
+    "@hello-pangea/dnd": "^16.6.0",
+    "@tanstack/react-query": "^5.0.0",
+    "@tanstack/react-query-devtools": "^5.0.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.0",
+    "tailwind-merge": "^2.5.0",
+    "lucide-react": "^0.460.0",
+    "date-fns": "^4.1.0",
+    "sonner": "^1.7.0",
+    "zod": "^3.23.0",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.0",
+    "autoprefixer": "^10.4.0",
+    "prisma": "^6.5.0",
+    "@tailwindcss/typography": "^0.5.0"
+  }
+}
