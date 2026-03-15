@@ -65,7 +65,7 @@ export function TaskCard({ task, index, onUpdate, onDelete }: TaskCardProps) {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5 mb-1">
                 {task.source === "openclaw_hook" && (
-                  <Bot className="h-3 w-3 text-primary shrink-0" title="Auto-logged by openclaw" />
+                  <Bot className="h-3 w-3 text-primary shrink-0" aria-label="Auto-logged by openclaw" />
                 )}
                 <p className="text-sm font-medium leading-snug">{task.title}</p>
               </div>
