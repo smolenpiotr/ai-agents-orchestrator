@@ -99,7 +99,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-6 max-w-2xl">
+    <div className="p-3 md:p-6 max-w-2xl">
       <div className="flex items-center gap-2 mb-6">
         <Settings className="h-5 w-5 text-primary" />
         <h1 className="text-xl font-bold">Settings</h1>

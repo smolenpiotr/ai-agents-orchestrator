@@ -59,9 +59,9 @@ export function KanbanColumn({
   }
 
   return (
-    <div className={cn("flex flex-col rounded-xl border-2 min-h-[200px] md:min-h-[400px]", column.color)}>
+    <div className={cn("flex flex-col rounded-xl border-2 min-h-[300px] h-full", column.color)}>
       {/* Header */}
-      <div className={cn("flex items-center justify-between px-3 py-2.5 rounded-t-lg", column.headerColor)}>
+      <div className={cn("flex items-center justify-between px-3 py-2.5 rounded-t-lg shrink-0", column.headerColor)}>
         <div className="flex items-center gap-2">
           <span className="font-semibold text-sm">{column.label}</span>
           <span className="text-xs px-1.5 py-0.5 rounded-full bg-black/10 dark:bg-white/10 font-mono">

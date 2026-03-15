@@ -92,4 +92,7 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+  .overflow-wrap-anywhere {
+    overflow-wrap: anywhere;
+  }
 }

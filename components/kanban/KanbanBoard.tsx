@@ -141,19 +141,23 @@ export function KanbanBoard({ agentId, initialTasks }: KanbanBoardProps) {
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 md:p-6 h-full">
-        {COLUMNS.map((col) => (
-          <KanbanColumn
-            key={col.id}
-            column={col}
-            tasks={columns[col.id]}
-            agentId={agentId}
-            onTaskAdded={handleTaskAdded}
-            onTaskUpdated={handleTaskUpdated}
-            onTaskDeleted={handleTaskDeleted}
-            onDoneCleared={col.id === "DONE" ? handleDoneCleared : undefined}
-          />
-        ))}
+      {/* Mobile: horizontal scroll with fixed-width columns; Desktop: 3-col grid */}
+      <div className="h-full overflow-x-auto overflow-y-hidden">
+        <div className="flex md:grid md:grid-cols-3 gap-3 md:gap-4 p-3 md:p-6 h-full min-w-max md:min-w-0">
+          {COLUMNS.map((col) => (
+            <div key={col.id} className="w-72 md:w-auto shrink-0 md:shrink flex flex-col">
+              <KanbanColumn
+                column={col}
+                tasks={columns[col.id]}
+                agentId={agentId}
+                onTaskAdded={handleTaskAdded}
+                onTaskUpdated={handleTaskUpdated}
+                onTaskDeleted={handleTaskDeleted}
+                onDoneCleared={col.id === "DONE" ? handleDoneCleared : undefined}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </DragDropContext>
   );

@@ -62,15 +62,15 @@ export function TaskCard({ task, index, onUpdate, onDelete }: TaskCardProps) {
           )}
         >
           <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 mb-1">
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <div className="flex items-start gap-1.5 mb-1">
                 {task.source === "openclaw_hook" && (
-                  <Bot className="h-3 w-3 text-primary shrink-0" aria-label="Auto-logged by openclaw" />
+                  <Bot className="h-3 w-3 text-primary shrink-0 mt-0.5" aria-label="Auto-logged by openclaw" />
                 )}
-                <p className="text-sm font-medium leading-snug">{task.title}</p>
+                <p className="text-sm font-medium leading-snug break-words overflow-wrap-anywhere min-w-0">{task.title}</p>
               </div>
               {task.description && (
-                <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                <p className="text-xs text-muted-foreground line-clamp-3 mt-0.5 break-words">
                   {task.description}
                 </p>
               )}

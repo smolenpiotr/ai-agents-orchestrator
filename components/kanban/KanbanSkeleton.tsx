@@ -1,8 +1,9 @@
 export function KanbanSkeleton() {
   return (
-    <div className="grid grid-cols-3 gap-4 p-6">
+    <div className="overflow-x-auto overflow-y-hidden h-full">
+      <div className="flex md:grid md:grid-cols-3 gap-3 md:gap-4 p-3 md:p-6 min-w-max md:min-w-0">
       {["Backlog", "In Progress", "Done"].map((label) => (
-        <div key={label} className="rounded-xl border-2 border-border min-h-[400px]">
+        <div key={label} className="w-72 md:w-auto rounded-xl border-2 border-border min-h-[300px]">
           <div className="flex items-center justify-between px-3 py-2.5 bg-muted/50 rounded-t-lg">
             <div className="flex items-center gap-2">
               <div className="h-4 w-16 bg-muted rounded animate-pulse" />
@@ -19,6 +20,7 @@ export function KanbanSkeleton() {
           </div>
         </div>
       ))}
+      </div>
     </div>
   );
 }
