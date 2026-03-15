@@ -8,6 +8,9 @@ const updateSchema = z.object({
   openclawAgentId: z.string().optional().nullable(),
   model: z.string().optional(),
   color: z.string().optional(),
+  isPersistent: z.boolean().optional(),
+  openclawSessionKey: z.string().optional().nullable(),
+  avatarUrl: z.string().optional().nullable(),
 });
 
 export async function GET(

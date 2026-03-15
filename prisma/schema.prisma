@@ -18,17 +18,20 @@ model User {
 }
 
 model Agent {
-  id              String       @id @default(cuid())
-  name            String
-  description     String?
-  openclawAgentId String?
-  model           String       @default("openclaw:main")
-  color           String       @default("#6366f1")
-  isMain          Boolean      @default(false)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  tasks           Task[]
-  agentSkills     AgentSkill[]
+  id                 String       @id @default(cuid())
+  name               String
+  description        String?
+  openclawAgentId    String?
+  model              String       @default("openclaw:main")
+  color              String       @default("#6366f1")
+  isMain             Boolean      @default(false)
+  isPersistent       Boolean      @default(false)
+  openclawSessionKey String?
+  avatarUrl          String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  tasks              Task[]
+  agentSkills        AgentSkill[]
 
   @@map("agents")
 }

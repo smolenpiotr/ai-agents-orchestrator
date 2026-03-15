@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings, CheckCircle, XCircle, Loader2, Eye, EyeOff, Copy } from "lucide-react";
+import { Settings, CheckCircle, XCircle, Loader2, Eye, EyeOff, Copy, Bot } from "lucide-react";
+import type { Agent } from "@/types/agent";
 import { toast } from "sonner";
 
 async function fetchSettings(): Promise<Record<string, string>> {
@@ -219,6 +220,115 @@ export default function SettingsPage() {
           </p>
         </div>
       </div>
+
+      {/* Agent Avatars */}
+      <AgentAvatarsSection />
+    </div>
+  );
+}
+
+async function fetchAgents(): Promise<Agent[]> {
+  const res = await fetch("/api/agents");
+  if (!res.ok) throw new Error("Failed to fetch agents");
+  return res.json();
+}
+
+function AgentAvatarsSection() {
+  const queryClient = useQueryClient();
+  const { data: agents = [], isLoading } = useQuery({
+    queryKey: ["agents"],
+    queryFn: fetchAgents,
+  });
+
+  const [avatarUrls, setAvatarUrls] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const urls: Record<string, string> = {};
+    for (const agent of agents) {
+      urls[agent.id] = agent.avatarUrl ?? "";
+    }
+    setAvatarUrls(urls);
+  }, [agents]);
+
+  async function handleSaveAvatar(agentId: string) {
+    setSaving((prev) => ({ ...prev, [agentId]: true }));
+    try {
+      const res = await fetch(`/api/agents/${agentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatarUrl: avatarUrls[agentId] || null }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      queryClient.invalidateQueries({ queryKey: ["agents"] });
+      toast.success("Avatar updated");
+    } catch {
+      toast.error("Failed to save avatar");
+    } finally {
+      setSaving((prev) => ({ ...prev, [agentId]: false }));
+    }
+  }
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-6 mt-6">
+      <h2 className="font-semibold mb-1">Agent Avatars</h2>
+      <p className="text-sm text-muted-foreground mb-4">
+        Set an avatar image URL for each agent
+      </p>
+
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-14 bg-muted rounded-lg animate-pulse" />
+          ))}
+        </div>
+      ) : agents.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No agents found</p>
+      ) : (
+        <div className="space-y-3">
+          {agents.map((agent) => (
+            <div key={agent.id} className="flex items-center gap-3 p-3 border border-border rounded-lg">
+              {/* Preview */}
+              <div
+                className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0 overflow-hidden"
+                style={{ backgroundColor: agent.color + "20" }}
+              >
+                {avatarUrls[agent.id] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarUrls[agent.id]}
+                    alt={agent.name}
+                    className="h-10 w-10 object-cover rounded-lg"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                ) : (
+                  <Bot className="h-5 w-5" style={{ color: agent.color }} />
+                )}
+              </div>
+
+              <div className="flex-1">
+                <p className="text-sm font-medium mb-1">{agent.name}</p>
+                <input
+                  type="url"
+                  value={avatarUrls[agent.id] ?? ""}
+                  onChange={(e) => setAvatarUrls((prev) => ({ ...prev, [agent.id]: e.target.value }))}
+                  placeholder="https://example.com/avatar.png"
+                  className="w-full px-3 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+
+              <button
+                onClick={() => handleSaveAvatar(agent.id)}
+                disabled={saving[agent.id]}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded text-xs font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors shrink-0"
+              >
+                {saving[agent.id] && <Loader2 className="h-3 w-3 animate-spin" />}
+                Save
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

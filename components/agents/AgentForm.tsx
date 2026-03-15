@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
@@ -25,6 +25,7 @@ export function AgentForm({ agent }: AgentFormProps) {
   const [description, setDescription] = useState(agent?.description ?? "");
   const [openclawAgentId, setOpenclawAgentId] = useState(agent?.openclawAgentId ?? "");
   const [color, setColor] = useState(agent?.color ?? AGENT_COLORS[0]);
+  const [isPersistent, setIsPersistent] = useState(agent?.isPersistent ?? false);
   const [loading, setLoading] = useState(false);
 
   const { data: openclawAgents = [] } = useQuery({
@@ -48,6 +49,7 @@ export function AgentForm({ agent }: AgentFormProps) {
           description: description.trim() || undefined,
           openclawAgentId: openclawAgentId.trim() || undefined,
           color,
+          isPersistent,
         }),
       });
 
@@ -133,6 +135,31 @@ export function AgentForm({ agent }: AgentFormProps) {
             />
           ))}
         </div>
+      </div>
+
+      {/* Persistent Sub-agent Toggle */}
+      <div className="flex items-center justify-between p-3 bg-muted/40 rounded-lg border border-border">
+        <div>
+          <p className="text-sm font-medium">Persistent Sub-agent</p>
+          <p className="text-xs text-muted-foreground">
+            This agent runs as a persistent OpenClaw session
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isPersistent}
+          onClick={() => setIsPersistent(!isPersistent)}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${
+            isPersistent ? "bg-primary" : "bg-muted-foreground/30"
+          }`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg transform transition-transform ${
+              isPersistent ? "translate-x-5" : "translate-x-0"
+            }`}
+          />
+        </button>
       </div>
 
       <div className="flex gap-3 pt-2">

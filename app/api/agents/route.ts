@@ -8,6 +8,8 @@ const createAgentSchema = z.object({
   openclawAgentId: z.string().optional(),
   model: z.string().optional(),
   color: z.string().optional(),
+  isPersistent: z.boolean().optional(),
+  avatarUrl: z.string().optional(),
 });
 
 export async function GET() {
@@ -51,6 +53,8 @@ export async function POST(req: Request) {
         openclawAgentId: data.openclawAgentId,
         model: data.model ?? "openclaw:main",
         color: data.color ?? "#6366f1",
+        isPersistent: data.isPersistent ?? false,
+        avatarUrl: data.avatarUrl,
       },
     });
 

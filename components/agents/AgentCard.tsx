@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { Bot, MoreHorizontal, Pencil, Trash2, Star, Kanban } from "lucide-react";
+import { Bot, MoreHorizontal, Pencil, Trash2, Star, Kanban, Zap } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -42,16 +42,32 @@ export function AgentCard({ agent }: AgentCardProps) {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
+          {/* Avatar or icon */}
           <div
-            className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0"
+            className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0 overflow-hidden"
             style={{ backgroundColor: agent.color + "20" }}
           >
-            <Bot className="h-5 w-5" style={{ color: agent.color }} />
+            {agent.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={agent.avatarUrl}
+                alt={agent.name}
+                className="h-9 w-9 object-cover rounded-lg"
+              />
+            ) : (
+              <Bot className="h-5 w-5" style={{ color: agent.color }} />
+            )}
           </div>
           <div>
             <div className="flex items-center gap-1.5">
               <h3 className="font-semibold text-sm">{agent.name}</h3>
               {agent.isMain && <Star className="h-3 w-3 text-amber-400 fill-amber-400" />}
+              {agent.isPersistent && (
+                <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 rounded text-[10px] font-medium">
+                  <Zap className="h-2.5 w-2.5" />
+                  Persistent
+                </span>
+              )}
             </div>
             {agent.openclawAgentId && (
               <p className="text-xs text-muted-foreground font-mono">

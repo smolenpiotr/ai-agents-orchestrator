@@ -17,4 +17,6 @@ export type CreateAgentInput = {
   openclawAgentId?: string;
   model?: string;
   color?: string;
+  isPersistent?: boolean;
+  avatarUrl?: string;
 };

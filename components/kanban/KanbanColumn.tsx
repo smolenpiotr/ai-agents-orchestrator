@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { Droppable } from "@hello-pangea/dnd";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { TaskCard } from "./TaskCard";
 import { TaskForm } from "./TaskForm";
 import type { Task, TaskStatus } from "@/types/task";
@@ -22,6 +23,7 @@ interface KanbanColumnProps {
   onTaskAdded: (task: Task) => void;
   onTaskUpdated: (task: Task) => void;
   onTaskDeleted: (taskId: string) => void;
+  onDoneCleared?: () => void;
 }
 
 export function KanbanColumn({
@@ -31,8 +33,32 @@ export function KanbanColumn({
   onTaskAdded,
   onTaskUpdated,
   onTaskDeleted,
+  onDoneCleared,
 }: KanbanColumnProps) {
   const [adding, setAdding] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  async function handleClearDone() {
+    if (tasks.length === 0) return;
+    if (!confirm(`Clear all ${tasks.length} DONE tasks? This cannot be undone.`)) return;
+
+    setClearing(true);
+    try {
+      const res = await fetch("/api/tasks/bulk", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId, status: "DONE" }),
+      });
+      if (!res.ok) throw new Error("Failed to clear tasks");
+      const data = await res.json();
+      onDoneCleared?.();
+      toast.success(`Cleared ${data.deleted} done tasks`);
+    } catch {
+      toast.error("Failed to clear done tasks");
+    } finally {
+      setClearing(false);
+    }
+  }
 
   return (
     <div className={cn("flex flex-col rounded-xl border-2 min-h-[400px]", column.color)}>
@@ -44,12 +70,25 @@ export function KanbanColumn({
             {tasks.length}
           </span>
         </div>
-        <button
-          onClick={() => setAdding(true)}
-          className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors opacity-70 hover:opacity-100"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          {column.id === "DONE" && tasks.length > 0 && (
+            <button
+              onClick={handleClearDone}
+              disabled={clearing}
+              title="Clear all done tasks"
+              className="flex items-center gap-1 px-2 py-0.5 text-xs rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors opacity-70 hover:opacity-100"
+            >
+              <Trash2 className="h-3 w-3" />
+              Clear
+            </button>
+          )}
+          <button
+            onClick={() => setAdding(true)}
+            className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors opacity-70 hover:opacity-100"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {/* Tasks */}

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { COLUMNS, GAP } from "@/lib/constants";
 import { KanbanColumn } from "./KanbanColumn";
 import type { Task, TaskStatus, KanbanData } from "@/types/task";
@@ -20,19 +21,40 @@ function calculateOrder(tasks: Task[], destinationIndex: number): number {
   const before = tasks[destinationIndex - 1].order;
   const after = tasks[destinationIndex].order;
   const mid = Math.floor((before + after) / 2);
-  // If gap is exhausted, just use before + 1 and reindex will be needed eventually
   return mid === before ? before + 1 : mid;
+}
+
+async function fetchTasks(agentId: string): Promise<KanbanData> {
+  const res = await fetch(`/api/agents/${agentId}/tasks`);
+  if (!res.ok) throw new Error("Failed to fetch tasks");
+  return res.json();
 }
 
 export function KanbanBoard({ agentId, initialTasks }: KanbanBoardProps) {
   const [columns, setColumns] = useState<KanbanData>(initialTasks);
+  const queryClient = useQueryClient();
+
+  const { data: tasks } = useQuery({
+    queryKey: ["tasks", agentId],
+    queryFn: () => fetchTasks(agentId),
+    refetchInterval: 30000,
+    initialData: initialTasks,
+  });
+
+  // Sync remote data into local state (only when not dragging)
+  useEffect(() => {
+    if (tasks) {
+      setColumns(tasks);
+    }
+  }, [tasks]);
 
   const handleTaskAdded = useCallback((task: Task) => {
     setColumns((prev) => ({
       ...prev,
       [task.status]: [...prev[task.status as TaskStatus], task],
     }));
-  }, []);
+    queryClient.invalidateQueries({ queryKey: ["tasks", agentId] });
+  }, [agentId, queryClient]);
 
   const handleTaskUpdated = useCallback((task: Task) => {
     setColumns((prev) => {
@@ -53,6 +75,11 @@ export function KanbanBoard({ agentId, initialTasks }: KanbanBoardProps) {
       return updated;
     });
   }, []);
+
+  const handleDoneCleared = useCallback(() => {
+    setColumns((prev) => ({ ...prev, DONE: [] }));
+    queryClient.invalidateQueries({ queryKey: ["tasks", agentId] });
+  }, [agentId, queryClient]);
 
   const onDragEnd = useCallback(
     async (result: DropResult) => {
@@ -124,6 +151,7 @@ export function KanbanBoard({ agentId, initialTasks }: KanbanBoardProps) {
             onTaskAdded={handleTaskAdded}
             onTaskUpdated={handleTaskUpdated}
             onTaskDeleted={handleTaskDeleted}
+            onDoneCleared={col.id === "DONE" ? handleDoneCleared : undefined}
           />
         ))}
       </div>
