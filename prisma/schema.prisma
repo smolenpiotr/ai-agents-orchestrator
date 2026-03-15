@@ -7,17 +7,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  @@map("users")
+}
+
 model Agent {
-  id              String   @id @default(cuid())
+  id              String       @id @default(cuid())
   name            String
   description     String?
   openclawAgentId String?
-  model           String   @default("openclaw:main")
-  color           String   @default("#6366f1")
-  isMain          Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  model           String       @default("openclaw:main")
+  color           String       @default("#6366f1")
+  isMain          Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
   tasks           Task[]
+  agentSkills     AgentSkill[]
 
   @@map("agents")
 }
@@ -44,6 +55,26 @@ model Settings {
   updatedAt DateTime @updatedAt
 
   @@map("settings")
+}
+
+model Skill {
+  id          String       @id @default(cuid())
+  slug        String       @unique
+  name        String
+  description String?
+  agentSkills AgentSkill[]
+
+  @@map("skills")
+}
+
+model AgentSkill {
+  agentId   String
+  skillSlug String
+  agent     Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  skill     Skill  @relation(fields: [skillSlug], references: [slug], onDelete: Cascade)
+
+  @@id([agentId, skillSlug])
+  @@map("agent_skills")
 }
 
 enum TaskStatus {

@@ -6,8 +6,8 @@ export async function seedMainAgent(): Promise<string> {
 
   const agent = await prisma.agent.create({
     data: {
-      name: "Main Agent",
-      description: "Your primary openclaw.ai agent",
+      name: "Prime",
+      description: "CEO's Assistant",
       openclawAgentId: "main",
       model: "openclaw:main",
       color: "#6366f1",
