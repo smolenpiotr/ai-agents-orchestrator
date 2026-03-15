@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Settings, CheckCircle, XCircle, Loader2, Eye, EyeOff, Copy, Bot } from "lucide-react";
 import type { Agent } from "@/types/agent";
@@ -240,40 +240,11 @@ function AgentAvatarsSection() {
     queryFn: fetchAgents,
   });
 
-  const [avatarUrls, setAvatarUrls] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    const urls: Record<string, string> = {};
-    for (const agent of agents) {
-      urls[agent.id] = agent.avatarUrl ?? "";
-    }
-    setAvatarUrls(urls);
-  }, [agents]);
-
-  async function handleSaveAvatar(agentId: string) {
-    setSaving((prev) => ({ ...prev, [agentId]: true }));
-    try {
-      const res = await fetch(`/api/agents/${agentId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avatarUrl: avatarUrls[agentId] || null }),
-      });
-      if (!res.ok) throw new Error("Failed to save");
-      queryClient.invalidateQueries({ queryKey: ["agents"] });
-      toast.success("Avatar updated");
-    } catch {
-      toast.error("Failed to save avatar");
-    } finally {
-      setSaving((prev) => ({ ...prev, [agentId]: false }));
-    }
-  }
-
   return (
     <div className="bg-card border border-border rounded-xl p-6 mt-6">
       <h2 className="font-semibold mb-1">Agent Avatars</h2>
       <p className="text-sm text-muted-foreground mb-4">
-        Set an avatar image URL for each agent
+        Upload a photo for each agent
       </p>
 
       {isLoading ? (
@@ -287,48 +258,108 @@ function AgentAvatarsSection() {
       ) : (
         <div className="space-y-3">
           {agents.map((agent) => (
-            <div key={agent.id} className="flex items-center gap-3 p-3 border border-border rounded-lg">
-              {/* Preview */}
-              <div
-                className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0 overflow-hidden"
-                style={{ backgroundColor: agent.color + "20" }}
-              >
-                {avatarUrls[agent.id] ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={avatarUrls[agent.id]}
-                    alt={agent.name}
-                    className="h-10 w-10 object-cover rounded-lg"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                  />
-                ) : (
-                  <Bot className="h-5 w-5" style={{ color: agent.color }} />
-                )}
-              </div>
-
-              <div className="flex-1">
-                <p className="text-sm font-medium mb-1">{agent.name}</p>
-                <input
-                  type="url"
-                  value={avatarUrls[agent.id] ?? ""}
-                  onChange={(e) => setAvatarUrls((prev) => ({ ...prev, [agent.id]: e.target.value }))}
-                  placeholder="https://example.com/avatar.png"
-                  className="w-full px-3 py-1.5 bg-background border border-input rounded text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-
-              <button
-                onClick={() => handleSaveAvatar(agent.id)}
-                disabled={saving[agent.id]}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded text-xs font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors shrink-0"
-              >
-                {saving[agent.id] && <Loader2 className="h-3 w-3 animate-spin" />}
-                Save
-              </button>
-            </div>
+            <AgentAvatarRow
+              key={agent.id}
+              agent={agent}
+              onUpdate={() => queryClient.invalidateQueries({ queryKey: ["agents"] })}
+            />
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function AgentAvatarRow({ agent, onUpdate }: { agent: Agent; onUpdate: () => void }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(agent.avatarUrl ?? null);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Show local preview immediately
+    const localUrl = URL.createObjectURL(file);
+    setPreviewUrl(localUrl);
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch(`/api/agents/${agent.id}/avatar`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      setPreviewUrl(data.avatarUrl);
+      onUpdate();
+      toast.success("Avatar updated");
+    } catch {
+      setPreviewUrl(agent.avatarUrl ?? null);
+      toast.error("Failed to upload avatar");
+    } finally {
+      setUploading(false);
+      // Reset input so same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-4 p-3 border border-border rounded-lg">
+      {/* Circular avatar preview */}
+      <div className="relative shrink-0">
+        <div
+          className="h-12 w-12 rounded-full flex items-center justify-center overflow-hidden"
+          style={{ backgroundColor: agent.color + "20" }}
+        >
+          {previewUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={previewUrl}
+              alt={agent.name}
+              className="h-12 w-12 object-cover rounded-full"
+              onError={() => setPreviewUrl(null)}
+            />
+          ) : (
+            <Bot className="h-6 w-6" style={{ color: agent.color }} />
+          )}
+        </div>
+        {uploading && (
+          <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
+            <Loader2 className="h-4 w-4 text-white animate-spin" />
+          </div>
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{agent.name}</p>
+        <p className="text-xs text-muted-foreground">
+          {previewUrl ? "Avatar set" : "No avatar"}
+        </p>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-muted text-muted-foreground rounded text-xs font-medium hover:bg-muted/80 disabled:opacity-50 transition-colors shrink-0"
+      >
+        {uploading ? (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        ) : null}
+        Upload photo
+      </button>
     </div>
   );
 }
