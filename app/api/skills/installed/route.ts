@@ -10,15 +10,28 @@ interface InstalledSkill {
   description: string;
 }
 
+const SKILLS_PATHS = [
+  join(os.homedir(), ".openclaw", "skills"),
+  "/opt/homebrew/lib/node_modules/openclaw/skills",
+  "/usr/local/lib/node_modules/openclaw/skills",
+];
+
 export async function GET() {
   try {
-    const skillsDir = join(os.homedir(), ".openclaw", "skills");
-
     let entries: string[] = [];
-    try {
-      entries = await readdir(skillsDir);
-    } catch {
-      // Skills directory doesn't exist yet
+    let skillsDir = "";
+
+    for (const dir of SKILLS_PATHS) {
+      try {
+        entries = await readdir(dir);
+        skillsDir = dir;
+        break;
+      } catch {
+        // try next path
+      }
+    }
+
+    if (!skillsDir) {
       return NextResponse.json([]);
     }
 

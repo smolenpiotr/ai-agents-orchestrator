@@ -311,20 +311,22 @@ export default function AgentDetailPage() {
   const { data: tasks, isLoading: tasksLoading, refetch: refetchTasks } = useQuery({
     queryKey: ["tasks", id],
     queryFn: () => fetchTasks(id),
-    enabled: activeTab === "board",
+    enabled: true,
     refetchInterval: 30000,
   });
 
   const { data: agentSkills = [], isLoading: agentSkillsLoading } = useQuery({
     queryKey: ["agentSkills", id],
     queryFn: () => fetchAgentSkills(id),
-    enabled: activeTab === "skills",
+    enabled: true,
+    refetchInterval: 30000,
   });
 
   const { data: installedSkills = [], isLoading: installedLoading } = useQuery({
     queryKey: ["skills", "installed"],
     queryFn: fetchInstalledSkills,
-    enabled: activeTab === "skills",
+    enabled: true,
+    refetchInterval: 30000,
   });
 
   const addSkillMutation = useMutation({
