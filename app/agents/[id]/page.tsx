@@ -550,7 +550,7 @@ export default function AgentDetailPage() {
                       </div>
                       <span className="text-xs font-mono text-muted-foreground shrink-0 hidden sm:inline">{skill.slug}</span>
                       <button
-                        onClick={() => removeSkillMutation.mutate(skill.slug)}
+                        onClick={() => { if (confirm(`Remove skill "${skill.name}"?`)) removeSkillMutation.mutate(skill.slug); }}
                         disabled={removeSkillMutation.isPending}
                         className="p-1 rounded hover:bg-red-500/10 hover:text-red-500 transition-colors text-muted-foreground"
                         title="Remove skill"
@@ -635,7 +635,7 @@ export default function AgentDetailPage() {
                         <span className="text-xs font-mono text-muted-foreground shrink-0 hidden sm:inline">{skill.slug}</span>
                         {assigned ? (
                           <button
-                            onClick={() => removeSkillMutation.mutate(skill.slug)}
+                            onClick={() => { if (confirm(`Remove skill "${skill.name}"?`)) removeSkillMutation.mutate(skill.slug); }}
                             disabled={removeSkillMutation.isPending}
                             className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors shrink-0"
                           >
