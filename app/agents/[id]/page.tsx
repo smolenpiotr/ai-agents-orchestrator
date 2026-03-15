@@ -165,15 +165,44 @@ function FileEditor({ name }: { name: string }) {
 // ---- Jobs Tab Component ----
 interface CronJob {
   id: string;
-  name: string;
-  schedule: string;
-  next: string;
-  last: string;
-  status: string;
-  target: string;
-  agentId: string;
-  model: string;
-  active: boolean;
+  name?: string;
+  enabled?: boolean;
+  agentId?: string;
+  sessionTarget?: string;
+  schedule?: {
+    kind: string;
+    expr: string;
+    tz?: string;
+  } | string;
+  state?: {
+    nextRunAtMs?: number;
+    lastRunAtMs?: number;
+    lastRunStatus?: string;
+    consecutiveErrors?: number;
+  };
+  // legacy flat fields
+  active?: boolean;
+  status?: string;
+  next?: string;
+  last?: string;
+  target?: string;
+}
+
+function formatRelativeTime(ms: number): string {
+  const diff = ms - Date.now();
+  const abs = Math.abs(diff);
+  const isPast = diff < 0;
+  if (abs < 60000) return isPast ? "just now" : "in <1 min";
+  if (abs < 3600000) {
+    const m = Math.round(abs / 60000);
+    return isPast ? `${m}m ago` : `in ${m}m`;
+  }
+  if (abs < 86400000) {
+    const h = Math.round(abs / 3600000);
+    return isPast ? `${h}h ago` : `in ${h}h`;
+  }
+  const d = Math.round(abs / 86400000);
+  return isPast ? `${d}d ago` : `in ${d}d`;
 }
 
 function JobsTab() {
@@ -240,49 +269,58 @@ function JobsTab() {
         </button>
       </div>
 
-      {jobs.map((job) => (
-        <div
-          key={job.id}
-          className="p-3 md:p-4 bg-card border border-border rounded-lg space-y-2"
-        >
-          {/* Top row: name + status badge */}
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-medium leading-tight">{job.name || `Job ${job.id.slice(0, 8)}`}</p>
-            <span className={cn(
-              "text-xs px-2 py-0.5 rounded-full font-medium shrink-0",
-              job.active
-                ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
-                : "bg-muted text-muted-foreground"
-            )}>
-              {job.status || (job.active ? "active" : "inactive")}
-            </span>
-          </div>
+      {jobs.map((job) => {
+        const isActive = job.enabled !== false && job.active !== false;
+        const scheduleExpr = typeof job.schedule === "object" ? job.schedule?.expr : job.schedule;
+        const scheduleTz = typeof job.schedule === "object" ? job.schedule?.tz : undefined;
+        const nextMs = job.state?.nextRunAtMs;
+        const lastMs = job.state?.lastRunAtMs;
+        const lastStatus = job.state?.lastRunStatus ?? job.status;
 
-          {/* Schedule */}
-          {job.schedule && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Clock className="h-3 w-3 shrink-0" />
-              <span className="font-mono break-all">{job.schedule}</span>
+        return (
+          <div
+            key={job.id}
+            className="p-3 md:p-4 bg-card border border-border rounded-lg space-y-2"
+          >
+            {/* Top row: name + status badge */}
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-medium leading-tight">{job.name || `Job ${job.id.slice(0, 8)}`}</p>
+              <span className={cn(
+                "text-xs px-2 py-0.5 rounded-full font-medium shrink-0",
+                isActive
+                  ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                  : "bg-muted text-muted-foreground"
+              )}>
+                {isActive ? "active" : "inactive"}
+              </span>
             </div>
-          )}
 
-          {/* Next / Last run */}
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            {job.next && (
-              <span>Next: <span className="text-foreground">{job.next}</span></span>
+            {/* Schedule */}
+            {scheduleExpr && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3 shrink-0" />
+                <span className="font-mono">{scheduleExpr}</span>
+                {scheduleTz && <span className="opacity-60">({scheduleTz})</span>}
+              </div>
             )}
-            {job.last && (
-              <span>Last: <span className="text-foreground">{job.last}</span></span>
-            )}
-            {job.target && (
-              <span>Target: <span className="text-foreground">{job.target}</span></span>
-            )}
-            {job.agentId && (
-              <span>Agent: <span className="font-mono text-foreground">{job.agentId}</span></span>
-            )}
+
+            {/* Next / Last run */}
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              {nextMs && (
+                <span>Next: <span className="text-foreground font-medium">{formatRelativeTime(nextMs)}</span></span>
+              )}
+              {lastMs && (
+                <span>Last: <span className="text-foreground">{formatRelativeTime(lastMs)}</span>
+                  {lastStatus && <span className={cn("ml-1", lastStatus === "ok" ? "text-green-500" : "text-red-500")}>({lastStatus})</span>}
+                </span>
+              )}
+              {(job.sessionTarget ?? job.target) && (
+                <span>Target: <span className="text-foreground">{job.sessionTarget ?? job.target}</span></span>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
