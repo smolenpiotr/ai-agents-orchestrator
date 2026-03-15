@@ -13,6 +13,7 @@
     "db:push": "prisma db push"
   },
   "dependencies": {
+    "@eslint/eslintrc": "^3.3.5",
     "@hello-pangea/dnd": "^16.6.0",
     "@prisma/client": "^6.5.0",
     "@tanstack/react-query": "^5.0.0",
@@ -22,6 +23,8 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "date-fns": "^4.1.0",
+    "eslint": "^10.0.3",
+    "eslint-config-next": "^16.1.6",
     "gray-matter": "^4.0.3",
     "lucide-react": "^0.460.0",
     "next": "^15.0.0",
