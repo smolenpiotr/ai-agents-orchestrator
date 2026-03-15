@@ -46,7 +46,7 @@ type Tab = "board" | "skills" | "files" | "jobs";
 
 // ---- Files Tab Component ----
 function FilesTab() {
-  const FILES = ["SOUL", "MEMORY", "HEARTBEAT"] as const;
+  const FILES = ["SOUL", "MEMORY", "HEARTBEAT", "AGENTS", "USER"] as const;
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">

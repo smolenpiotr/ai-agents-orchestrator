@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-const ALLOWED_FILES = ["SOUL", "MEMORY", "HEARTBEAT"];
+const ALLOWED_FILES = ["SOUL", "MEMORY", "HEARTBEAT", "AGENTS", "USER"];
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);

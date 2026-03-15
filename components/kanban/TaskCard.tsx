@@ -111,10 +111,10 @@ export function TaskCard({ task, index, onUpdate, onDelete }: TaskCardProps) {
                   const diff = new Date(task.nextRunAt).getTime() - Date.now();
                   const abs = Math.abs(diff);
                   const isPast = diff < 0;
-                  if (abs < 60000) return isPast ? "just ran" : "runs in <1 min";
-                  if (abs < 3600000) { const m = Math.round(abs / 60000); return isPast ? `ran ${m}m ago` : `runs in ${m}m`; }
-                  if (abs < 86400000) { const h = Math.round(abs / 3600000); return isPast ? `ran ${h}h ago` : `runs in ${h}h`; }
-                  const d = Math.round(abs / 86400000); return isPast ? `ran ${d}d ago` : `runs in ${d}d`;
+                  if (abs < 60000) return isPast ? "next action: just now" : "next action: <1 min";
+                  if (abs < 3600000) { const m = Math.round(abs / 60000); return isPast ? `next action: ${m}m ago` : `next action in ${m}m`; }
+                  if (abs < 86400000) { const h = Math.round(abs / 3600000); return isPast ? `next action: ${h}h ago` : `next action in ${h}h`; }
+                  const d = Math.round(abs / 86400000); return isPast ? `next action: ${d}d ago` : `next action in ${d}d`;
                 })()
               : formatDistanceToNow(new Date(task.createdAt), { addSuffix: true })}
           </p>
