@@ -45,6 +45,7 @@ model Task {
   agentId     String
   source      String     @default("manual")
   hidden      Boolean    @default(false)
+  nextRunAt   DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   agent       Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
