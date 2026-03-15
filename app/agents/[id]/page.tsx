@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Bot, Star, LayoutKanban, Package } from "lucide-react";
+import { Bot, Star, Kanban, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { KanbanSkeleton } from "@/components/kanban/KanbanSkeleton";
@@ -97,7 +97,7 @@ export default function AgentDetailPage() {
                 : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
-            <LayoutKanban className="h-4 w-4" />
+            <Kanban className="h-4 w-4" />
             Board
           </button>
           <button

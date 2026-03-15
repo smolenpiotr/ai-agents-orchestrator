@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { Bot, MoreHorizontal, Pencil, Trash2, Star, LayoutKanban } from "lucide-react";
+import { Bot, MoreHorizontal, Pencil, Trash2, Star, Kanban } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -121,7 +121,7 @@ export function AgentCard({ agent }: AgentCardProps) {
           href={`/agents/${agent.id}`}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary/10 text-primary hover:bg-primary/20 rounded-md transition-colors"
         >
-          <LayoutKanban className="h-4 w-4" />
+          <Kanban className="h-4 w-4" />
           Open Board
         </Link>
       </div>
