@@ -9,9 +9,9 @@ export const authConfig: NextAuthConfig = {
   },
   providers: [], // Providers added in auth.ts (Node environment only)
   callbacks: {
-    authorized({ auth, request: { nextUrl } }) {
+    authorized({ auth, request }) {
       const isLoggedIn = !!auth?.user;
-      const pathname = nextUrl.pathname;
+      const pathname = request.nextUrl.pathname;
 
       // Public routes
       if (pathname === "/login" || pathname === "/register") {
