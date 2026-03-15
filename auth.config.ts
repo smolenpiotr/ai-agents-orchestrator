@@ -23,6 +23,14 @@ export const authConfig: NextAuthConfig = {
         return true;
       }
 
+      // Allow internal API calls with x-internal-key header
+      if (pathname.startsWith("/api/")) {
+        const internalKey = request.headers.get("x-internal-key");
+        if (internalKey && internalKey === process.env.INTERNAL_API_KEY) {
+          return true;
+        }
+      }
+
       return isLoggedIn;
     },
   },
