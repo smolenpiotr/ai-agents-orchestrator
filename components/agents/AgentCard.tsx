@@ -116,7 +116,7 @@ export function AgentCard({ agent }: AgentCardProps) {
       )}
 
       {/* Task stats */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="flex items-center gap-1 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs text-slate-600 dark:text-slate-300">
           <span className="font-semibold">{agent.taskStats.BACKLOG}</span> Backlog
         </span>

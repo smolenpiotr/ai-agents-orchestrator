@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bot, Star, Kanban, Package, Plus, X, Search, RefreshCw, FileText, Clock } from "lucide-react";
@@ -49,7 +49,7 @@ function FilesTab() {
   const FILES = ["SOUL", "MEMORY", "HEARTBEAT"] as const;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       {FILES.map((name) => (
         <FileEditor key={name} name={name} />
       ))}
@@ -59,19 +59,36 @@ function FilesTab() {
 
 function FileEditor({ name }: { name: string }) {
   const [content, setContent] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
 
-  const { isLoading } = useQuery({
+  const { data: serverContent, isLoading, isError } = useQuery({
     queryKey: ["file", name],
     queryFn: async () => {
-      const res = await fetch(`/api/files?name=${name}`);
+      const res = await fetch(`/api/files?name=${name}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
       if (!res.ok) throw new Error("Failed to load file");
       const data = await res.json();
-      setContent(data.content);
-      return data.content;
+      return data.content as string;
     },
+    staleTime: Infinity, // don't auto-refetch and overwrite edits
+    refetchOnWindowFocus: false,
   });
+
+  // Sync server content into local state on first successful load only
+  useEffect(() => {
+    if (serverContent !== undefined && !isDirty) {
+      setContent(serverContent);
+    }
+  }, [serverContent, isDirty]);
+
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setContent(e.target.value);
+    setIsDirty(true);
+  }
 
   async function handleSave() {
     if (content === null) return;
@@ -85,6 +102,7 @@ function FileEditor({ name }: { name: string }) {
       if (!res.ok) throw new Error("Failed to save");
       const data = await res.json();
       setLastSaved(data.savedAt);
+      setIsDirty(false);
       toast.success(`${name}.md saved`);
     } catch {
       toast.error(`Failed to save ${name}.md`);
@@ -99,9 +117,12 @@ function FileEditor({ name }: { name: string }) {
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4 text-primary" />
           <span className="font-semibold text-sm">{name}.md</span>
+          {isDirty && (
+            <span className="text-xs text-amber-500 font-medium">unsaved</span>
+          )}
         </div>
         <div className="flex items-center gap-3">
-          {lastSaved && (
+          {lastSaved && !isDirty && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
               Saved {new Date(lastSaved).toLocaleTimeString()}
@@ -109,7 +130,7 @@ function FileEditor({ name }: { name: string }) {
           )}
           <button
             onClick={handleSave}
-            disabled={saving || isLoading || content === null}
+            disabled={saving || isLoading || content === null || !isDirty}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
             {saving ? <RefreshCw className="h-3 w-3 animate-spin" /> : null}
@@ -118,14 +139,21 @@ function FileEditor({ name }: { name: string }) {
         </div>
       </div>
       {isLoading ? (
-        <div className="p-4">
-          <div className="h-32 bg-muted rounded animate-pulse" />
+        <div className="p-4 space-y-2">
+          <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
+          <div className="h-4 bg-muted rounded animate-pulse w-1/2" />
+          <div className="h-4 bg-muted rounded animate-pulse w-5/6" />
+          <div className="h-4 bg-muted rounded animate-pulse w-2/3" />
+        </div>
+      ) : isError ? (
+        <div className="p-4 text-sm text-muted-foreground">
+          Failed to load {name}.md — files proxy may not be configured.
         </div>
       ) : (
         <textarea
           value={content ?? ""}
-          onChange={(e) => setContent(e.target.value)}
-          className="w-full p-4 bg-background text-sm font-mono resize-none focus:outline-none min-h-[200px]"
+          onChange={handleChange}
+          className="w-full p-3 md:p-4 bg-background text-sm font-mono resize-y focus:outline-none min-h-[200px]"
           placeholder={`${name}.md content...`}
           rows={12}
         />
@@ -136,55 +164,35 @@ function FileEditor({ name }: { name: string }) {
 
 // ---- Jobs Tab Component ----
 interface CronJob {
-  id?: string;
-  name?: string;
-  schedule?: string;
-  lastRun?: string;
-  enabled?: boolean;
-  active?: boolean;
-  [key: string]: unknown;
+  id: string;
+  name: string;
+  schedule: string;
+  next: string;
+  last: string;
+  status: string;
+  target: string;
+  agentId: string;
+  model: string;
+  active: boolean;
 }
 
 function JobsTab() {
-  const queryClient = useQueryClient();
-
-  const { data: jobsData, isLoading, error } = useQuery({
+  const { data: jobsData, isLoading, error, refetch } = useQuery({
     queryKey: ["jobs"],
     queryFn: async () => {
-      const res = await fetch("/api/jobs");
+      const res = await fetch("/api/jobs", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to fetch jobs");
-      return res.json();
+      return res.json() as Promise<{ source: string; jobs: CronJob[] }>;
     },
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
-
-  async function handleToggle(jobId: string) {
-    try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/toggle`, { method: "POST" });
-      if (!res.ok) throw new Error("Failed to toggle job");
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      toast.success("Job updated");
-    } catch {
-      toast.error("Failed to toggle job");
-    }
-  }
-
-  async function handleDelete(jobId: string) {
-    if (!confirm("Delete this cron job?")) return;
-    try {
-      const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete job");
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      toast.success("Job deleted");
-    } catch {
-      toast.error("Failed to delete job");
-    }
-  }
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="h-16 bg-muted rounded-lg animate-pulse" />
+      <div className="p-3 md:p-6 space-y-3">
+        {[1, 2].map((i) => (
+          <div key={i} className="h-20 bg-muted rounded-lg animate-pulse" />
         ))}
       </div>
     );
@@ -192,105 +200,89 @@ function JobsTab() {
 
   if (error) {
     return (
-      <div className="p-6 text-muted-foreground text-sm">Failed to load jobs</div>
+      <div className="p-3 md:p-6 text-muted-foreground text-sm">
+        Failed to load cron jobs.
+      </div>
     );
   }
 
-  const jobs: CronJob[] = Array.isArray(jobsData?.jobs)
-    ? jobsData.jobs
-    : typeof jobsData?.jobs === "object" && jobsData?.jobs !== null
-    ? Object.entries(jobsData.jobs).map(([k, v]) => ({ id: k, ...(v as object) }))
-    : [];
+  const jobs: CronJob[] = jobsData?.jobs ?? [];
 
-  if (jobsData?.source === "none" || jobs.length === 0) {
+  if (jobs.length === 0) {
     return (
-      <div className="p-6">
+      <div className="p-3 md:p-6">
         <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground bg-muted/30 rounded-lg border border-dashed border-border">
           <Clock className="h-8 w-8 opacity-40" />
           <p className="text-sm font-medium">No cron jobs found</p>
           <p className="text-xs opacity-60">OpenClaw cron jobs will appear here</p>
+          <button
+            onClick={() => refetch()}
+            className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border border-border hover:bg-muted transition-colors"
+          >
+            <RefreshCw className="h-3 w-3" /> Refresh
+          </button>
         </div>
       </div>
     );
   }
 
-  // If the format looks unknown, show raw JSON
-  const isKnownFormat = jobs.length > 0 && (jobs[0].id !== undefined || jobs[0].name !== undefined);
-
   return (
-    <div className="p-6 space-y-3">
-      {jobsData?.source === "file" && (
+    <div className="p-3 md:p-6 space-y-3">
+      <div className="flex items-center justify-between mb-1">
         <p className="text-xs text-muted-foreground">
-          Source: <code className="bg-muted px-1 rounded">{jobsData.path}</code>
+          {jobs.length} job{jobs.length !== 1 ? "s" : ""} from OpenClaw
         </p>
-      )}
+        <button
+          onClick={() => refetch()}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <RefreshCw className="h-3 w-3" /> Refresh
+        </button>
+      </div>
 
-      {!isKnownFormat ? (
-        <div>
-          <p className="text-sm text-muted-foreground mb-2">Raw cron data — management coming soon</p>
-          <pre className="bg-muted/50 border border-border rounded-lg p-4 text-xs overflow-auto max-h-64">
-            {JSON.stringify(jobsData.jobs, null, 2)}
-          </pre>
-        </div>
-      ) : (
-        jobs.map((job, idx) => {
-          const jobId = String(job.id ?? job.name ?? idx);
-          const isActive = job.enabled !== false && job.active !== false;
+      {jobs.map((job) => (
+        <div
+          key={job.id}
+          className="p-3 md:p-4 bg-card border border-border rounded-lg space-y-2"
+        >
+          {/* Top row: name + status badge */}
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-medium leading-tight">{job.name || `Job ${job.id.slice(0, 8)}`}</p>
+            <span className={cn(
+              "text-xs px-2 py-0.5 rounded-full font-medium shrink-0",
+              job.active
+                ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                : "bg-muted text-muted-foreground"
+            )}>
+              {job.status || (job.active ? "active" : "inactive")}
+            </span>
+          </div>
 
-          return (
-            <div key={jobId} className="flex items-center gap-4 p-3 bg-card border border-border rounded-lg">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{job.name ?? job.id ?? `Job ${idx + 1}`}</p>
-                <div className="flex items-center gap-3 mt-0.5">
-                  {job.schedule && (
-                    <span className="text-xs font-mono text-muted-foreground">{String(job.schedule)}</span>
-                  )}
-                  {job.lastRun && (
-                    <span className="text-xs text-muted-foreground">
-                      Last: {String(job.lastRun)}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <span className={cn(
-                "text-xs px-2 py-0.5 rounded-full font-medium",
-                isActive
-                  ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
-                  : "bg-muted text-muted-foreground"
-              )}>
-                {isActive ? "Active" : "Inactive"}
-              </span>
-
-              {/* Toggle switch */}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={isActive}
-                onClick={() => handleToggle(jobId)}
-                title={isActive ? "Disable" : "Enable"}
-                className={cn(
-                  "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
-                  isActive ? "bg-primary" : "bg-muted-foreground/30"
-                )}
-              >
-                <span className={cn(
-                  "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform",
-                  isActive ? "translate-x-4" : "translate-x-0"
-                )} />
-              </button>
-
-              <button
-                onClick={() => handleDelete(jobId)}
-                className="p-1.5 rounded hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground"
-                title="Delete job"
-              >
-                <X className="h-4 w-4" />
-              </button>
+          {/* Schedule */}
+          {job.schedule && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3 shrink-0" />
+              <span className="font-mono break-all">{job.schedule}</span>
             </div>
-          );
-        })
-      )}
+          )}
+
+          {/* Next / Last run */}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            {job.next && (
+              <span>Next: <span className="text-foreground">{job.next}</span></span>
+            )}
+            {job.last && (
+              <span>Last: <span className="text-foreground">{job.last}</span></span>
+            )}
+            {job.target && (
+              <span>Target: <span className="text-foreground">{job.target}</span></span>
+            )}
+            {job.agentId && (
+              <span>Agent: <span className="font-mono text-foreground">{job.agentId}</span></span>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -372,7 +364,7 @@ export default function AgentDetailPage() {
 
   if (agentLoading) {
     return (
-      <div className="p-6">
+      <div className="p-3 md:p-6">
         <div className="h-8 w-48 bg-muted rounded animate-pulse mb-2" />
         <div className="h-4 w-64 bg-muted rounded animate-pulse" />
       </div>
@@ -392,7 +384,7 @@ export default function AgentDetailPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Agent header */}
-      <div className="px-6 pt-5 pb-0 border-b border-border">
+      <div className="px-3 md:px-6 pt-4 md:pt-5 pb-0 border-b border-border">
         <div className="flex items-center gap-3 mb-4">
           {/* Avatar */}
           <div
@@ -406,23 +398,23 @@ export default function AgentDetailPage() {
               <Bot className="h-5 w-5" style={{ color: agent.color }} />
             )}
           </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold">{agent.name}</h1>
-              {agent.isMain && <Star className="h-4 w-4 text-amber-400 fill-amber-400" />}
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <h1 className="text-base md:text-lg font-bold">{agent.name}</h1>
+              {agent.isMain && <Star className="h-4 w-4 text-amber-400 fill-amber-400 shrink-0" />}
               {agent.isPersistent && (
-                <span className="text-xs px-2 py-0.5 bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 rounded-full font-medium">
+                <span className="text-xs px-2 py-0.5 bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 rounded-full font-medium whitespace-nowrap">
                   Persistent
                 </span>
               )}
               {agent.openclawAgentId && (
-                <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full font-mono">
+                <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full font-mono truncate max-w-[120px] md:max-w-none">
                   openclaw:{agent.openclawAgentId}
                 </span>
               )}
             </div>
             {agent.description && (
-              <p className="text-sm text-muted-foreground">{agent.description}</p>
+              <p className="text-sm text-muted-foreground line-clamp-2">{agent.description}</p>
             )}
           </div>
           {/* Manual refresh button */}
@@ -439,11 +431,11 @@ export default function AgentDetailPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1">
+        <div className="flex gap-1 overflow-x-auto scrollbar-hide -mx-3 md:mx-0 px-3 md:px-0">
           <button
             onClick={() => setActiveTab("board")}
             className={cn(
-              "flex items-center gap-1.5 px-4 py-2 text-sm rounded-t-lg border border-b-0 transition-colors",
+              "flex items-center gap-1.5 px-3 md:px-4 py-2 text-sm rounded-t-lg border border-b-0 transition-colors whitespace-nowrap min-h-[44px]",
               activeTab === "board"
                 ? "bg-background border-border text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -455,7 +447,7 @@ export default function AgentDetailPage() {
           <button
             onClick={() => setActiveTab("skills")}
             className={cn(
-              "flex items-center gap-1.5 px-4 py-2 text-sm rounded-t-lg border border-b-0 transition-colors",
+              "flex items-center gap-1.5 px-3 md:px-4 py-2 text-sm rounded-t-lg border border-b-0 transition-colors whitespace-nowrap min-h-[44px]",
               activeTab === "skills"
                 ? "bg-background border-border text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -473,7 +465,7 @@ export default function AgentDetailPage() {
             <button
               onClick={() => setActiveTab("files")}
               className={cn(
-                "flex items-center gap-1.5 px-4 py-2 text-sm rounded-t-lg border border-b-0 transition-colors",
+                "flex items-center gap-1.5 px-3 md:px-4 py-2 text-sm rounded-t-lg border border-b-0 transition-colors whitespace-nowrap min-h-[44px]",
                 activeTab === "files"
                   ? "bg-background border-border text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -487,7 +479,7 @@ export default function AgentDetailPage() {
             <button
               onClick={() => setActiveTab("jobs")}
               className={cn(
-                "flex items-center gap-1.5 px-4 py-2 text-sm rounded-t-lg border border-b-0 transition-colors",
+                "flex items-center gap-1.5 px-3 md:px-4 py-2 text-sm rounded-t-lg border border-b-0 transition-colors whitespace-nowrap min-h-[44px]",
                 activeTab === "jobs"
                   ? "bg-background border-border text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -518,7 +510,7 @@ export default function AgentDetailPage() {
         )}
 
         {activeTab === "skills" && (
-          <div className="p-6 space-y-6">
+          <div className="p-3 md:p-6 space-y-4 md:space-y-6">
             {/* Assigned skills */}
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -556,7 +548,7 @@ export default function AgentDetailPage() {
                           <p className="text-xs text-muted-foreground truncate">{skill.description}</p>
                         )}
                       </div>
-                      <span className="text-xs font-mono text-muted-foreground shrink-0">{skill.slug}</span>
+                      <span className="text-xs font-mono text-muted-foreground shrink-0 hidden sm:inline">{skill.slug}</span>
                       <button
                         onClick={() => removeSkillMutation.mutate(skill.slug)}
                         disabled={removeSkillMutation.isPending}
@@ -640,7 +632,7 @@ export default function AgentDetailPage() {
                             <p className="text-xs text-muted-foreground truncate">{skill.description}</p>
                           )}
                         </div>
-                        <span className="text-xs font-mono text-muted-foreground shrink-0">{skill.slug}</span>
+                        <span className="text-xs font-mono text-muted-foreground shrink-0 hidden sm:inline">{skill.slug}</span>
                         {assigned ? (
                           <button
                             onClick={() => removeSkillMutation.mutate(skill.slug)}

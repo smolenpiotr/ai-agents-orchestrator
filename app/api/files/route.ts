@@ -29,7 +29,12 @@ export async function GET(req: Request) {
     });
     if (!res.ok) throw new Error(`Proxy error ${res.status}`);
     const data = await res.json();
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        "Pragma": "no-cache",
+      },
+    });
   } catch (error) {
     console.error("[GET /api/files] proxy error:", error);
     return NextResponse.json({ error: "Failed to reach files proxy" }, { status: 502 });

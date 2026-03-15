@@ -1,55 +1,89 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
-const CRON_PATHS = [
-  path.join(process.env.HOME || "/Users/piotrsmo", ".openclaw", "crontab.json"),
-  path.join(process.env.HOME || "/Users/piotrsmo", ".openclaw", "crons.json"),
-];
-
-async function readCronFile(): Promise<{ source: string; data: unknown } | null> {
-  for (const p of CRON_PATHS) {
-    try {
-      const content = await fs.readFile(p, "utf-8");
-      return { source: p, data: JSON.parse(content) };
-    } catch {
-      // try next
-    }
-  }
-  return null;
+export interface CronJobEntry {
+  id: string;
+  name: string;
+  schedule: string;
+  next: string;
+  last: string;
+  status: string;
+  target: string;
+  agentId: string;
+  model: string;
+  active: boolean;
 }
 
-async function readCronCLI(): Promise<unknown | null> {
-  try {
-    const { stdout } = await execAsync("openclaw cron list --output json 2>/dev/null", { timeout: 5000 });
-    if (stdout.trim()) {
-      return JSON.parse(stdout.trim());
-    }
-  } catch {
-    // CLI not available or failed
+/**
+ * Parse the tabular output from `openclaw cron list`.
+ * Columns: ID | Name | Schedule | Next | Last | Status | Target | Agent ID | Model
+ */
+function parseCronListOutput(stdout: string): CronJobEntry[] {
+  const lines = stdout.split("\n").filter((l) => l.trim());
+
+  // Find the header line
+  const headerIdx = lines.findIndex((l) =>
+    l.includes("ID") && l.includes("Name") && l.includes("Schedule")
+  );
+  if (headerIdx === -1) return [];
+
+  const dataLines = lines.slice(headerIdx + 1).filter((l) => {
+    const t = l.trim();
+    // Skip separator/box lines and doctor warnings
+    return t.length > 0 && !t.startsWith("│") && !t.startsWith("◇") && !t.startsWith("├") && !t.startsWith("─");
+  });
+
+  const jobs: CronJobEntry[] = [];
+
+  for (const line of dataLines) {
+    // Split by 2+ spaces (the CLI uses spaced columns)
+    const parts = line.trim().split(/\s{2,}/);
+    if (parts.length < 6) continue;
+
+    const [id, name, schedule, next, last, status, target, agentId, model] = parts;
+
+    // Must look like a UUID
+    if (!id || !/^[0-9a-f-]{36}$/.test(id.trim())) continue;
+
+    jobs.push({
+      id: id.trim(),
+      name: name?.trim() ?? "",
+      schedule: schedule?.trim() ?? "",
+      next: next?.trim() ?? "",
+      last: last?.trim() ?? "",
+      status: status?.trim() ?? "",
+      target: target?.trim() ?? "",
+      agentId: agentId?.trim() ?? "",
+      model: model?.trim() ?? "",
+      active: status?.trim().toLowerCase() === "ok" || status?.trim().toLowerCase() === "active",
+    });
   }
-  return null;
+
+  return jobs;
 }
 
 export async function GET() {
   try {
-    const fileResult = await readCronFile();
-    if (fileResult) {
-      return NextResponse.json({ source: "file", path: fileResult.source, jobs: fileResult.data });
-    }
+    // Try CLI — strip ANSI escape codes from output
+    const { stdout } = await execAsync(
+      "openclaw cron list 2>/dev/null | sed 's/\\x1b\\[[0-9;]*m//g'",
+      { timeout: 8000 }
+    );
 
-    const cliResult = await readCronCLI();
-    if (cliResult) {
-      return NextResponse.json({ source: "cli", jobs: cliResult });
-    }
+    const jobs = parseCronListOutput(stdout);
 
-    return NextResponse.json({ source: "none", jobs: [] });
+    return NextResponse.json(
+      { source: "cli", jobs },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error) {
-    console.error("[GET /api/jobs]", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("[GET /api/jobs] CLI error:", error);
+    return NextResponse.json(
+      { source: "none", jobs: [] },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   }
 }

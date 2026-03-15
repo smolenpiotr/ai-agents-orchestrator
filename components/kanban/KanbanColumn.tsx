@@ -40,8 +40,6 @@ export function KanbanColumn({
 
   async function handleClearDone() {
     if (tasks.length === 0) return;
-    if (!confirm(`Clear all ${tasks.length} DONE tasks? This cannot be undone.`)) return;
-
     setClearing(true);
     try {
       const res = await fetch("/api/tasks/bulk", {
@@ -61,7 +59,7 @@ export function KanbanColumn({
   }
 
   return (
-    <div className={cn("flex flex-col rounded-xl border-2 min-h-[400px]", column.color)}>
+    <div className={cn("flex flex-col rounded-xl border-2 min-h-[200px] md:min-h-[400px]", column.color)}>
       {/* Header */}
       <div className={cn("flex items-center justify-between px-3 py-2.5 rounded-t-lg", column.headerColor)}>
         <div className="flex items-center gap-2">
@@ -84,7 +82,7 @@ export function KanbanColumn({
           )}
           <button
             onClick={() => setAdding(true)}
-            className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors opacity-70 hover:opacity-100"
+            className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors opacity-70 hover:opacity-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
           >
             <Plus className="h-4 w-4" />
           </button>

@@ -141,7 +141,7 @@ export function KanbanBoard({ agentId, initialTasks }: KanbanBoardProps) {
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 h-full">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-3 md:p-6 h-full">
         {COLUMNS.map((col) => (
           <KanbanColumn
             key={col.id}

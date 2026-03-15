@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
-const bulkDeleteSchema = z.object({
+const bulkHideSchema = z.object({
   agentId: z.string().min(1),
   status: z.enum(["BACKLOG", "IN_PROGRESS", "DONE"]),
 });
@@ -10,13 +10,16 @@ const bulkDeleteSchema = z.object({
 export async function DELETE(req: Request) {
   try {
     const body = await req.json();
-    const data = bulkDeleteSchema.parse(body);
+    const data = bulkHideSchema.parse(body);
 
-    const result = await prisma.task.deleteMany({
+    // Soft-hide instead of hard delete — preserves history
+    const result = await prisma.task.updateMany({
       where: {
         agentId: data.agentId,
         status: data.status,
+        hidden: false,
       },
+      data: { hidden: true },
     });
 
     return NextResponse.json({ deleted: result.count });

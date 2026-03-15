@@ -9,8 +9,8 @@ export async function GET(
   const { id } = await params;
   try {
     const tasks = await prisma.task.findMany({
-      where: { agentId: id },
-      orderBy: [{ status: "asc" }, { order: "asc" }],
+      where: { agentId: id, hidden: false },
+      orderBy: [{ createdAt: "desc" }],
     });
 
     const grouped: Record<TaskStatus, typeof tasks> = {

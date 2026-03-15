@@ -24,8 +24,8 @@ export default async function AgentsPage() {
   });
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-3 md:p-6">
+      <div className="flex items-center justify-between mb-4 md:mb-6">
         <div>
           <h1 className="text-xl font-bold">Agents</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -34,10 +34,10 @@ export default async function AgentsPage() {
         </div>
         <Link
           href="/agents/new"
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors min-h-[44px]"
         >
           <Plus className="h-4 w-4" />
-          New Agent
+          <span>New Agent</span>
         </Link>
       </div>
 
