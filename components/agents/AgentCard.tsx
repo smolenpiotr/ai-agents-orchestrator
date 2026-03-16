@@ -34,6 +34,11 @@ export function AgentCard({ agent }: AgentCardProps) {
     }
   }
 
+  const budgetPercent =
+    agent.monthlyBudgetUsd && agent.monthlyBudgetUsd > 0
+      ? Math.min(100, (agent.spentThisMonthUsd / agent.monthlyBudgetUsd) * 100)
+      : null;
+
   return (
     <div
       className="bg-card border border-border rounded-xl p-5 flex flex-col gap-4 hover:border-primary/30 transition-all"
@@ -69,6 +74,9 @@ export function AgentCard({ agent }: AgentCardProps) {
                 </span>
               )}
             </div>
+            {agent.role && (
+              <p className="text-xs text-muted-foreground">{agent.role}</p>
+            )}
             {agent.openclawAgentId && (
               <p className="text-xs text-muted-foreground font-mono">
                 openclaw:{agent.openclawAgentId}
@@ -110,9 +118,38 @@ export function AgentCard({ agent }: AgentCardProps) {
         </div>
       </div>
 
+      {/* Goal */}
+      {agent.goal && (
+        <p className="text-xs text-primary/80 bg-primary/5 border border-primary/10 rounded-md px-2 py-1.5 line-clamp-2">
+          🎯 {agent.goal}
+        </p>
+      )}
+
       {/* Description */}
       {agent.description && (
         <p className="text-sm text-muted-foreground line-clamp-2">{agent.description}</p>
+      )}
+
+      {/* Budget progress bar */}
+      {budgetPercent !== null && agent.monthlyBudgetUsd && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Used ${agent.spentThisMonthUsd.toFixed(2)} of ${agent.monthlyBudgetUsd.toFixed(2)}</span>
+            <span className={budgetPercent >= 90 ? "text-red-500 font-medium" : ""}>{budgetPercent.toFixed(0)}%</span>
+          </div>
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${
+                budgetPercent >= 90
+                  ? "bg-red-500"
+                  : budgetPercent >= 70
+                  ? "bg-amber-500"
+                  : "bg-primary"
+              }`}
+              style={{ width: `${budgetPercent}%` }}
+            />
+          </div>
+        </div>
       )}
 
       {/* Task stats */}

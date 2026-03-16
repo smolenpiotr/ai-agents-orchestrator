@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { AgentCard } from "@/components/agents/AgentCard";
+import { AgentsViewToggle } from "@/components/agents/AgentsViewToggle";
 import { Bot, Plus } from "lucide-react";
 import type { AgentWithStats } from "@/types/agent";
 
@@ -32,13 +33,15 @@ export default async function AgentsPage() {
             {agents.length} agent{agents.length !== 1 ? "s" : ""} configured
           </p>
         </div>
-        <Link
-          href="/agents/new"
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors min-h-[44px]"
-        >
-          <Plus className="h-4 w-4" />
-          <span>New Agent</span>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/agents/new"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors min-h-[44px]"
+          >
+            <Plus className="h-4 w-4" />
+            <span>New Agent</span>
+          </Link>
+        </div>
       </div>
 
       {agentsWithStats.length === 0 ? (
@@ -55,11 +58,7 @@ export default async function AgentsPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {agentsWithStats.map((agent) => (
-            <AgentCard key={agent.id} agent={agent} />
-          ))}
-        </div>
+        <AgentsViewToggle agents={agentsWithStats} />
       )}
     </div>
   );

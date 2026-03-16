@@ -19,4 +19,8 @@ export type CreateAgentInput = {
   color?: string;
   isPersistent?: boolean;
   avatarUrl?: string;
+  parentAgentId?: string;
+  role?: string;
+  goal?: string;
+  monthlyBudgetUsd?: number;
 };

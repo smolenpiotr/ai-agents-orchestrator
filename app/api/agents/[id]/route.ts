@@ -11,6 +11,13 @@ const updateSchema = z.object({
   isPersistent: z.boolean().optional(),
   openclawSessionKey: z.string().optional().nullable(),
   avatarUrl: z.string().optional().nullable(),
+  // Feature 1: hierarchy
+  parentAgentId: z.string().optional().nullable(),
+  role: z.string().optional().nullable(),
+  // Feature 2: goal
+  goal: z.string().optional().nullable(),
+  // Feature 3: budget
+  monthlyBudgetUsd: z.number().optional().nullable(),
 });
 
 export async function GET(

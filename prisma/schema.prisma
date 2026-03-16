@@ -28,10 +28,23 @@ model Agent {
   isPersistent       Boolean      @default(false)
   openclawSessionKey String?
   avatarUrl          String?
+  // Feature 1: hierarchy
+  parentAgentId      String?
+  role               String?
+  // Feature 2: goal/mission
+  goal               String?
+  // Feature 3: token budget
+  monthlyBudgetUsd   Float?
+  spentThisMonthUsd  Float        @default(0)
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
   tasks              Task[]
   agentSkills        AgentSkill[]
+  // Feature 1: self-relation
+  parent             Agent?       @relation("AgentChildren", fields: [parentAgentId], references: [id])
+  children           Agent[]      @relation("AgentChildren")
+  // Feature 5: activity logs
+  agentLogs          AgentLog[]
 
   @@map("agents")
 }
@@ -80,6 +93,20 @@ model AgentSkill {
 
   @@id([agentId, skillSlug])
   @@map("agent_skills")
+}
+
+// Feature 5: Activity/Audit log
+model AgentLog {
+  id        String   @id @default(cuid())
+  agentId   String
+  type      String
+  title     String
+  detail    String?
+  createdAt DateTime @default(now())
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, createdAt])
+  @@map("agent_logs")
 }
 
 enum TaskStatus {

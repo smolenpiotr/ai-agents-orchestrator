@@ -19,19 +19,39 @@ async function fetchOpenclawAgents(): Promise<OpenclawAgent[]> {
   return res.json();
 }
 
+async function fetchAllAgents(): Promise<Agent[]> {
+  const res = await fetch("/api/agents");
+  if (!res.ok) return [];
+  return res.json();
+}
+
 export function AgentForm({ agent }: AgentFormProps) {
   const router = useRouter();
   const [name, setName] = useState(agent?.name ?? "");
   const [description, setDescription] = useState(agent?.description ?? "");
+  const [goal, setGoal] = useState(agent?.goal ?? "");
   const [openclawAgentId, setOpenclawAgentId] = useState(agent?.openclawAgentId ?? "");
   const [color, setColor] = useState(agent?.color ?? AGENT_COLORS[0]);
   const [isPersistent, setIsPersistent] = useState(agent?.isPersistent ?? false);
+  const [role, setRole] = useState(agent?.role ?? "");
+  const [parentAgentId, setParentAgentId] = useState(agent?.parentAgentId ?? "");
+  const [monthlyBudgetUsd, setMonthlyBudgetUsd] = useState(
+    agent?.monthlyBudgetUsd != null ? String(agent.monthlyBudgetUsd) : ""
+  );
   const [loading, setLoading] = useState(false);
 
   const { data: openclawAgents = [] } = useQuery({
     queryKey: ["openclaw-agents"],
     queryFn: fetchOpenclawAgents,
   });
+
+  const { data: allAgents = [] } = useQuery({
+    queryKey: ["agents"],
+    queryFn: fetchAllAgents,
+  });
+
+  // Exclude self from parent options
+  const parentOptions = allAgents.filter((a) => a.id !== agent?.id);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,9 +67,13 @@ export function AgentForm({ agent }: AgentFormProps) {
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim() || undefined,
+          goal: goal.trim() || undefined,
           openclawAgentId: openclawAgentId.trim() || undefined,
           color,
           isPersistent,
+          role: role.trim() || undefined,
+          parentAgentId: parentAgentId || undefined,
+          monthlyBudgetUsd: monthlyBudgetUsd ? parseFloat(monthlyBudgetUsd) : undefined,
         }),
       });
 
@@ -78,6 +102,16 @@ export function AgentForm({ agent }: AgentFormProps) {
       </div>
 
       <div>
+        <label className="block text-sm font-medium mb-1.5">Role</label>
+        <input
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          placeholder="e.g. Product Manager, Developer, QA"
+          className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+      </div>
+
+      <div>
         <label className="block text-sm font-medium mb-1.5">Description</label>
         <textarea
           value={description}
@@ -86,6 +120,35 @@ export function AgentForm({ agent }: AgentFormProps) {
           rows={3}
           className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
         />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1.5">Goal / Mission</label>
+        <textarea
+          value={goal}
+          onChange={(e) => setGoal(e.target.value)}
+          placeholder="What is the primary goal or mission of this agent?"
+          rows={3}
+          className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+        />
+        <p className="text-xs text-muted-foreground mt-1">The high-level objective this agent is working toward</p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1.5">Parent Agent</label>
+        <select
+          value={parentAgentId}
+          onChange={(e) => setParentAgentId(e.target.value)}
+          className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="">-- No parent (top-level) --</option>
+          {parentOptions.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}{a.role ? ` (${a.role})` : ""}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-muted-foreground mt-1">Set to build the agent hierarchy / org chart</p>
       </div>
 
       <div>
@@ -135,6 +198,20 @@ export function AgentForm({ agent }: AgentFormProps) {
             />
           ))}
         </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1.5">Monthly Budget (USD)</label>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={monthlyBudgetUsd}
+          onChange={(e) => setMonthlyBudgetUsd(e.target.value)}
+          placeholder="e.g. 10.00"
+          className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+        <p className="text-xs text-muted-foreground mt-1">Optional token/API cost cap per month</p>
       </div>
 
       {/* Persistent Sub-agent Toggle */}

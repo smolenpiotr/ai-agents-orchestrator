@@ -10,6 +10,13 @@ const createAgentSchema = z.object({
   color: z.string().optional(),
   isPersistent: z.boolean().optional(),
   avatarUrl: z.string().optional(),
+  // Feature 1: hierarchy
+  parentAgentId: z.string().optional(),
+  role: z.string().optional(),
+  // Feature 2: goal
+  goal: z.string().optional(),
+  // Feature 3: budget
+  monthlyBudgetUsd: z.number().optional(),
 });
 
 export async function GET() {
@@ -55,6 +62,10 @@ export async function POST(req: Request) {
         color: data.color ?? "#6366f1",
         isPersistent: data.isPersistent ?? false,
         avatarUrl: data.avatarUrl,
+        parentAgentId: data.parentAgentId,
+        role: data.role,
+        goal: data.goal,
+        monthlyBudgetUsd: data.monthlyBudgetUsd,
       },
     });
 
