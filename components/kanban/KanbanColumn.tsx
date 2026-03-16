@@ -59,7 +59,7 @@ export function KanbanColumn({
   }
 
   return (
-    <div className={cn("flex flex-col rounded-xl border-2 min-h-[300px] h-full", column.color)}>
+    <div className={cn("flex flex-col rounded-xl border-2 min-h-[300px] h-full max-h-[calc(100vh-220px)]", column.color)}>
       {/* Header */}
       <div className={cn("flex items-center justify-between px-3 py-2.5 rounded-t-lg shrink-0", column.headerColor)}>
         <div className="flex items-center gap-2">
@@ -96,7 +96,7 @@ export function KanbanColumn({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={cn(
-              "flex-1 px-2 py-2 space-y-2 min-h-[60px] rounded-b-lg transition-colors",
+              "flex-1 px-2 py-2 space-y-2 min-h-[60px] rounded-b-lg transition-colors overflow-y-auto",
               snapshot.isDraggingOver && "bg-primary/5"
             )}
           >
