@@ -11,72 +11,93 @@ interface AgentsViewToggleProps {
   agents: AgentWithStats[];
 }
 
-function TreeNode({ agent, agents, depth = 0 }: { agent: AgentWithStats; agents: AgentWithStats[]; depth?: number }) {
+function TreeNode({ agent, agents, depth = 0, isLast = false }: { agent: AgentWithStats; agents: AgentWithStats[]; depth?: number; isLast?: boolean }) {
   const children = agents.filter((a) => a.parentAgentId === agent.id);
+  const isRoot = depth === 0;
 
   return (
     <li className="relative">
-      {/* Node */}
-      <div className={cn("flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group", depth > 0 && "ml-6")}>
-        {/* Tree line */}
-        {depth > 0 && (
-          <div className="absolute left-0 top-0 bottom-0 w-px bg-border" style={{ left: `${(depth - 1) * 24 + 12}px` }} />
-        )}
-        {depth > 0 && (
-          <div className="absolute border-b border-border" style={{ left: `${(depth - 1) * 24 + 12}px`, width: "16px", top: "50%" }} />
-        )}
+      {/* Connector lines for non-root nodes */}
+      {!isRoot && (
+        <>
+          {/* Vertical line from parent */}
+          <div className="absolute top-0 bottom-0 w-px bg-border/60" style={{ left: -17 }} />
+          {/* Horizontal connector */}
+          <div className="absolute w-4 h-px bg-border/60" style={{ left: -17, top: 20 }} />
+          {/* Cut vertical line below last child */}
+          {isLast && <div className="absolute top-5 bottom-0 w-px bg-background" style={{ left: -17 }} />}
+        </>
+      )}
 
-        {/* Agent avatar */}
+      {/* Node card */}
+      <div className={cn(
+        "group flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all hover:border-primary/30 hover:shadow-sm",
+        isRoot
+          ? "bg-card border-primary/20 shadow-sm"
+          : "bg-card border-border ml-4"
+      )}>
+        {/* Avatar */}
         <div
-          className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 overflow-hidden"
-          style={{ backgroundColor: agent.color + "20" }}
+          className={cn("rounded-lg flex items-center justify-center shrink-0 overflow-hidden", isRoot ? "h-10 w-10" : "h-8 w-8")}
+          style={{ backgroundColor: agent.color + "25" }}
         >
           {agent.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={agent.avatarUrl} alt={agent.name} className="h-8 w-8 object-cover rounded-lg" />
+            <img src={agent.avatarUrl} alt={agent.name} className={cn("object-cover rounded-lg", isRoot ? "h-10 w-10" : "h-8 w-8")} />
           ) : (
-            <Bot className="h-4 w-4" style={{ color: agent.color }} />
+            <Bot className={cn(isRoot ? "h-5 w-5" : "h-4 w-4")} style={{ color: agent.color }} />
           )}
         </div>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-sm font-semibold truncate">{agent.name}</span>
+            <span className={cn("font-semibold truncate", isRoot ? "text-base" : "text-sm")}>{agent.name}</span>
             {agent.isMain && <Star className="h-3 w-3 text-amber-400 fill-amber-400 shrink-0" />}
             {agent.isPersistent && (
               <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 rounded text-[10px] font-medium shrink-0">
-                <Zap className="h-2.5 w-2.5" />
-                Persistent
+                <Zap className="h-2.5 w-2.5" /> Persistent
               </span>
             )}
             {agent.role && (
-              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{agent.role}</span>
+              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">{agent.role}</span>
             )}
           </div>
-          {agent.goal && (
+          {agent.goal ? (
             <p className="text-xs text-muted-foreground truncate mt-0.5">🎯 {agent.goal}</p>
-          )}
+          ) : agent.description ? (
+            <p className="text-xs text-muted-foreground truncate mt-0.5">{agent.description}</p>
+          ) : null}
         </div>
 
-        {/* Stats */}
-        <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
-          <span className="hidden sm:inline">{agent.taskStats.BACKLOG + agent.taskStats.IN_PROGRESS} active</span>
+        {/* Stats + link */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
+            {agent.taskStats.IN_PROGRESS > 0 && (
+              <span className="px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded font-medium">
+                {agent.taskStats.IN_PROGRESS} active
+              </span>
+            )}
+            {agent.taskStats.BACKLOG > 0 && (
+              <span className="px-1.5 py-0.5 bg-muted text-muted-foreground rounded">
+                {agent.taskStats.BACKLOG} backlog
+              </span>
+            )}
+          </div>
           <Link
             href={`/agents/${agent.id}`}
             className="flex items-center gap-1 px-2 py-1 text-xs bg-primary/10 text-primary hover:bg-primary/20 rounded transition-colors opacity-0 group-hover:opacity-100"
           >
-            <Kanban className="h-3 w-3" />
-            Board
+            <Kanban className="h-3 w-3" /> Board
           </Link>
         </div>
       </div>
 
       {/* Children */}
       {children.length > 0 && (
-        <ul className="relative ml-6 border-l border-border pl-4 mt-0.5 space-y-0.5">
-          {children.map((child) => (
-            <TreeNode key={child.id} agent={child} agents={agents} depth={depth + 1} />
+        <ul className="relative mt-1 ml-5 pl-4 space-y-1.5">
+          {children.map((child, idx) => (
+            <TreeNode key={child.id} agent={child} agents={agents} depth={depth + 1} isLast={idx === children.length - 1} />
           ))}
         </ul>
       )}
