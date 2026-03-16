@@ -34,22 +34,7 @@ export async function PATCH(
       data,
     });
 
-    // Auto-create log entry when status changes
-    if (data.status && prevTask && prevTask.status !== data.status) {
-      try {
-        await prisma.agentLog.create({
-          data: {
-            agentId: task.agentId,
-            type: "task_status",
-            title: `Task moved to ${STATUS_LABELS[data.status] ?? data.status}`,
-            detail: `"${task.title}" → ${STATUS_LABELS[data.status] ?? data.status}`,
-          },
-        });
-      } catch (logErr) {
-        // Don't fail the task update if logging fails
-        console.error("[task status log]", logErr);
-      }
-    }
+    // Kanban task changes are NOT logged in Activity (too noisy)
 
     return NextResponse.json(task);
   } catch (error) {
