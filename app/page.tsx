@@ -17,14 +17,15 @@ async function getStats() {
   return { totalAgents, activeTasks, doneToday: doneTodayCount };
 }
 
-async function getRecentActivity() {
+async function getRecentDoneTasks() {
   try {
-    const logs = await prisma.agentLog.findMany({
+    const tasks = await prisma.task.findMany({
+      where: { status: "DONE", hidden: false },
       take: 10,
-      orderBy: { createdAt: "desc" },
+      orderBy: { updatedAt: "desc" },
       include: { agent: { select: { name: true, color: true, id: true } } },
     });
-    return logs;
+    return tasks;
   } catch {
     return [];
   }
@@ -48,9 +49,9 @@ function LogTypeIcon({ type }: { type: string }) {
 }
 
 export default async function DashboardPage() {
-  const [stats, recentActivity, dbHealthy] = await Promise.all([
+  const [stats, recentDoneTasks, dbHealthy] = await Promise.all([
     getStats(),
-    getRecentActivity(),
+    getRecentDoneTasks(),
     checkDbHealth(),
   ]);
 
@@ -152,37 +153,35 @@ export default async function DashboardPage() {
 
       {/* Recent activity */}
       <div className="bg-card border border-border rounded-xl p-5">
-        <h2 className="font-semibold mb-4">Recent Activity</h2>
-        {recentActivity.length === 0 ? (
+        <h2 className="font-semibold mb-4">Recently Completed</h2>
+        {recentDoneTasks.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
             <Activity className="h-8 w-8 opacity-40" />
-            <p className="text-sm">No activity yet</p>
-            <p className="text-xs opacity-60">Activity will appear here as tasks are updated</p>
+            <p className="text-sm">No completed tasks yet</p>
+            <p className="text-xs opacity-60">Completed tasks will appear here</p>
           </div>
         ) : (
           <div className="space-y-1">
-            {recentActivity.map((log) => (
+            {recentDoneTasks.map((task) => (
               <Link
-                key={log.id}
-                href={`/agents/${log.agent.id}`}
+                key={task.id}
+                href={`/agents/${task.agent.id}`}
                 className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors group"
               >
                 <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center shrink-0 mt-0.5">
-                  <LogTypeIcon type={log.type} />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-medium" style={{ color: log.agent.color }}>
-                      {log.agent.name}
+                    <span className="text-xs font-medium" style={{ color: task.agent.color }}>
+                      {task.agent.name}
                     </span>
-                    <span className="text-sm">{log.title}</span>
+                    <span className="text-sm">{task.title}</span>
                   </div>
-                  {log.detail && (
-                    <p className="text-xs text-muted-foreground truncate">{log.detail}</p>
-                  )}
+                  
                 </div>
                 <span className="text-xs text-muted-foreground shrink-0 mt-0.5">
-                  {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
+                  {formatDistanceToNow(new Date(task.updatedAt), { addSuffix: true })}
                 </span>
               </Link>
             ))}
