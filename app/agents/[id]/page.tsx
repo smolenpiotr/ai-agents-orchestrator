@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Bot, Star, Kanban, Package, Plus, X, Search, RefreshCw, FileText, Clock,
-  Zap, Activity, MessageSquare, Send, AlertCircle, GitBranch, CheckCircle2,
-  ArrowRight, ListTodo, Loader2,
+  Zap, AlertCircle, GitBranch,
+  ArrowRight, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
@@ -15,26 +15,12 @@ import { SkillsBrowser } from "@/components/skills/SkillsBrowser";
 import type { Agent } from "@/types/agent";
 import type { KanbanData } from "@/types/task";
 import { toast } from "sonner";
-import { formatDistanceToNow } from "date-fns";
+
 
 interface Skill {
   slug: string;
   name: string;
   description?: string | null;
-}
-
-interface AgentLog {
-  id: string;
-  agentId: string;
-  type: string;
-  title: string;
-  detail?: string | null;
-  createdAt: string;
-}
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
 }
 
 async function fetchAgent(id: string): Promise<Agent> {
@@ -61,12 +47,6 @@ async function fetchInstalledSkills(): Promise<Skill[]> {
   return res.json();
 }
 
-async function fetchLogs(id: string): Promise<AgentLog[]> {
-  const res = await fetch(`/api/agents/${id}/logs?limit=50`);
-  if (!res.ok) throw new Error("Failed to fetch logs");
-  return res.json();
-}
-
 async function fetchDirectReports(parentId: string): Promise<Agent[]> {
   const res = await fetch("/api/agents");
   if (!res.ok) throw new Error("Failed to fetch agents");
@@ -74,210 +54,7 @@ async function fetchDirectReports(parentId: string): Promise<Agent[]> {
   return all.filter((a) => a.parentAgentId === parentId);
 }
 
-type Tab = "board" | "skills" | "files" | "jobs" | "activity" | "chat";
-
-// ---- Log type icons ----
-function LogIcon({ type }: { type: string }) {
-  switch (type) {
-    case "task_status": return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-    case "task_created": return <ListTodo className="h-4 w-4 text-blue-500" />;
-    case "spawn": return <Zap className="h-4 w-4 text-violet-500" />;
-    case "error": return <AlertCircle className="h-4 w-4 text-red-500" />;
-    default: return <Activity className="h-4 w-4 text-muted-foreground" />;
-  }
-}
-
-// ---- Activity Tab ----
-function ActivityTab({ agentId }: { agentId: string }) {
-  const { data: logs = [], isLoading } = useQuery({
-    queryKey: ["logs", agentId],
-    queryFn: () => fetchLogs(agentId),
-    refetchInterval: 15000,
-  });
-
-  if (isLoading) {
-    return (
-      <div className="p-3 md:p-6 space-y-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="h-14 bg-muted rounded-lg animate-pulse" />
-        ))}
-      </div>
-    );
-  }
-
-  if (logs.length === 0) {
-    return (
-      <div className="p-3 md:p-6">
-        <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground bg-muted/30 rounded-lg border border-dashed border-border">
-          <Activity className="h-8 w-8 opacity-40" />
-          <p className="text-sm font-medium">No activity yet</p>
-          <p className="text-xs opacity-60">Activity will appear here as tasks are updated</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-3 md:p-6">
-      <div className="space-y-0">
-        {logs.map((log, idx) => (
-          <div key={log.id} className="flex gap-3 relative">
-            {/* Timeline line */}
-            {idx < logs.length - 1 && (
-              <div className="absolute left-[15px] top-8 bottom-0 w-px bg-border" />
-            )}
-            {/* Icon */}
-            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0 z-10">
-              <LogIcon type={log.type} />
-            </div>
-            {/* Content */}
-            <div className="flex-1 pb-4 min-w-0">
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-medium leading-tight">{log.title}</p>
-                <span className="text-xs text-muted-foreground shrink-0">
-                  {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
-                </span>
-              </div>
-              {log.detail && (
-                <p className="text-xs text-muted-foreground mt-0.5">{log.detail}</p>
-              )}
-              <span className="text-[10px] text-muted-foreground/60 mt-0.5 inline-block">{log.type}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ---- Chat Tab ----
-function ChatTab({ agent }: { agent: Agent }) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const [gatewayOnline, setGatewayOnline] = useState<boolean | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  // Check gateway status when tab is opened
-  useEffect(() => {
-    fetch("/api/openclaw/ping")
-      .then((r) => r.json())
-      .then((data) => setGatewayOnline(data?.online === true || data === true))
-      .catch(() => setGatewayOnline(false));
-  }, []);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  if (!agent.openclawAgentId) {
-    return (
-      <div className="p-3 md:p-6">
-        <div className="flex flex-col items-center gap-3 py-12 text-muted-foreground bg-muted/30 rounded-lg border border-dashed border-border">
-          <MessageSquare className="h-8 w-8 opacity-40" />
-          <p className="text-sm font-medium">No OpenClaw agent linked</p>
-          <p className="text-xs opacity-60">Edit this agent and set an OpenClaw Agent ID to enable chat</p>
-        </div>
-      </div>
-    );
-  }
-
-  async function handleSend() {
-    if (!input.trim() || sending) return;
-    const userMsg: ChatMessage = { role: "user", content: input.trim() };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setSending(true);
-
-    try {
-      const res = await fetch("/api/openclaw/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          agentId: agent.openclawAgentId,
-          messages: [...messages, userMsg],
-        }),
-      });
-      if (!res.ok) throw new Error("Chat failed");
-      const data = await res.json();
-      const reply = data.content ?? data.message ?? data.reply ?? JSON.stringify(data);
-      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "⚠️ Failed to get response. Check gateway status." },
-      ]);
-    } finally {
-      setSending(false);
-    }
-  }
-
-  return (
-    <div className="flex flex-col h-full">
-      {/* Gateway status banner */}
-      {gatewayOnline === false && (
-        <div className="mx-3 md:mx-6 mt-3 flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-700 dark:text-amber-400">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          Gateway offline — messages may not be delivered
-        </div>
-      )}
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 md:p-6 space-y-3">
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
-            <MessageSquare className="h-8 w-8 opacity-40" />
-            <p className="text-sm">Send a message to {agent.name}</p>
-          </div>
-        )}
-        {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}
-          >
-            <div
-              className={cn(
-                "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm",
-                msg.role === "user"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-foreground"
-              )}
-            >
-              {msg.content}
-            </div>
-          </div>
-        ))}
-        {sending && (
-          <div className="flex justify-start">
-            <div className="bg-muted rounded-2xl px-4 py-2.5">
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            </div>
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Input */}
-      <div className="p-3 md:p-4 border-t border-border flex gap-2">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-          placeholder={`Message ${agent.name}...`}
-          className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-          disabled={sending}
-        />
-        <button
-          onClick={handleSend}
-          disabled={sending || !input.trim()}
-          className="px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >
-          <Send className="h-4 w-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
+type Tab = "board" | "skills" | "files" | "jobs";
 
 // ---- Files Tab Component ----
 function FilesTab() {
@@ -730,7 +507,7 @@ export default function AgentDetailPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 overflow-x-auto scrollbar-hide -mx-3 md:mx-0 px-3 md:px-0">
-          {(["board", "skills", "activity", "chat"] as Tab[]).map((tab) => (
+          {(["board", "skills"] as Tab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -741,8 +518,6 @@ export default function AgentDetailPage() {
             >
               {tab === "board" && <Kanban className="h-4 w-4" />}
               {tab === "skills" && <Package className="h-4 w-4" />}
-              {tab === "activity" && <Activity className="h-4 w-4" />}
-              {tab === "chat" && <MessageSquare className="h-4 w-4" />}
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
               {tab === "skills" && agentSkills.length > 0 && (
                 <span className="ml-1 text-xs bg-primary/15 text-primary px-1.5 rounded-full">{agentSkills.length}</span>
@@ -923,8 +698,6 @@ export default function AgentDetailPage() {
           </div>
         )}
 
-        {activeTab === "activity" && <ActivityTab agentId={id} />}
-        {activeTab === "chat" && <ChatTab agent={agent} />}
         {activeTab === "files" && isMain && <FilesTab />}
         {activeTab === "jobs" && isMain && <JobsTab />}
       </div>

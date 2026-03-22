@@ -114,3 +114,23 @@ enum TaskStatus {
   IN_PROGRESS
   DONE
 }
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+  url         String?
+  color       String        @default("#6366f1")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  ACTIVE
+  PAUSED
+  DONE
+  IDEA
+}

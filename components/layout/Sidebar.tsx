@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Bot, Plus, Star, X } from "lucide-react";
+import { Bot, Plus, Star, X, FolderKanban } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AgentWithStats } from "@/types/agent";
 
@@ -120,7 +120,20 @@ function SidebarContent({
         )}
       </nav>
 
-      <div className="p-3 border-t border-sidebar-border">
+      <div className="p-3 border-t border-sidebar-border space-y-2">
+        <Link
+          href="/projects"
+          onClick={onLinkClick}
+          className={cn(
+            "flex items-center gap-2 w-full px-3 py-2.5 rounded-md text-sm transition-colors min-h-[44px]",
+            pathname === "/projects" || pathname.startsWith("/projects/")
+              ? "bg-sidebar-accent text-sidebar-foreground"
+              : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+          )}
+        >
+          <FolderKanban className="h-4 w-4" />
+          Projects
+        </Link>
         <Link
           href="/agents/new"
           onClick={onLinkClick}
