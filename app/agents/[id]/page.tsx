@@ -178,6 +178,7 @@ interface CronJob {
   sessionTarget?: string;
   schedule?: { kind: string; expr: string; tz?: string } | string;
   state?: { nextRunAtMs?: number; lastRunAtMs?: number; lastRunStatus?: string; consecutiveErrors?: number };
+  payload?: { model?: string; timeoutSeconds?: number };
   active?: boolean;
   status?: string;
   next?: string;
@@ -248,6 +249,8 @@ function JobsTab() {
         const isActive = job.enabled !== false && job.active !== false;
         const scheduleExpr = typeof job.schedule === "object" ? job.schedule?.expr : job.schedule;
         const scheduleTz = typeof job.schedule === "object" ? job.schedule?.tz : undefined;
+        const model = job.payload?.model ?? "default";
+        const modelShort = model === "default" ? "default" : model.split("/").pop()?.replace("anthropic/","") ?? model;
         const nextMs = job.state?.nextRunAtMs;
         const lastMs = job.state?.lastRunAtMs;
         const lastStatus = job.state?.lastRunStatus ?? job.status;
@@ -269,6 +272,7 @@ function JobsTab() {
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
               {nextMs && <span>Next: <span className="text-foreground font-medium">{formatRelativeTime(nextMs)}</span></span>}
               {lastMs && <span>Last: <span className="text-foreground">{formatRelativeTime(lastMs)}</span>{lastStatus && <span className={cn("ml-1", lastStatus === "ok" ? "text-green-500" : "text-red-500")}>({lastStatus})</span>}</span>}
+              <span>Model: <span className={cn("font-mono", model === "default" ? "text-muted-foreground" : "text-primary")}>{modelShort}</span></span>
               {(job.sessionTarget ?? job.target) && <span>Target: <span className="text-foreground">{job.sessionTarget ?? job.target}</span></span>}
             </div>
           </div>
