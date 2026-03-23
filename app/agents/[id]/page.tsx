@@ -393,6 +393,24 @@ function JobsTab() {
       {/* Heartbeat section — always pinned at top */}
       <HeartbeatCard jobs={allJobs} />
 
+      {/* Total monthly cost summary */}
+      {allJobs.length > 0 && (() => {
+        const heartbeatCost = parseFloat(estimateMonthlyCost("*/15 * * * *", "claude-haiku-3-5").replace(/[^0-9.]/g, "")) || 0;
+        const cronCost = regularJobs.reduce((sum, job) => {
+          const expr = typeof job.schedule === "object" ? job.schedule?.expr ?? "" : job.schedule ?? "";
+          const model = job.payload?.model ?? "default";
+          const val = parseFloat(estimateMonthlyCost(expr, model).replace(/[^0-9.]/g, "")) || 0;
+          return sum + val;
+        }, 0);
+        const total = (heartbeatCost + cronCost).toFixed(2);
+        return (
+          <div className="flex items-center justify-between px-3 py-2 bg-muted/40 rounded-lg border border-border">
+            <span className="text-xs text-muted-foreground">Estimated total monthly cost (all jobs)</span>
+            <span className="text-sm font-semibold text-foreground">~€{total}/month</span>
+          </div>
+        );
+      })()}
+
       {/* Regular cron jobs header */}
       <div className="flex items-center justify-between mt-2">
         <p className="text-xs text-muted-foreground">{regularJobs.length} cron job{regularJobs.length !== 1 ? "s" : ""} from OpenClaw</p>
