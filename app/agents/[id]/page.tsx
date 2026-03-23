@@ -390,10 +390,7 @@ function JobsTab() {
 
   return (
     <div className="p-3 md:p-6 space-y-3">
-      {/* Heartbeat section — always pinned at top */}
-      <HeartbeatCard jobs={allJobs} />
-
-      {/* Total monthly cost summary */}
+      {/* Total monthly cost summary — pinned above heartbeat */}
       {allJobs.length > 0 && (() => {
         const heartbeatCost = parseFloat(estimateMonthlyCost("*/15 * * * *", "claude-haiku-3-5").replace(/[^0-9.]/g, "")) || 0;
         const cronCost = regularJobs.reduce((sum, job) => {
@@ -410,6 +407,9 @@ function JobsTab() {
           </div>
         );
       })()}
+
+      {/* Heartbeat section — below total cost */}
+      <HeartbeatCard jobs={allJobs} />
 
       {/* Regular cron jobs header */}
       <div className="flex items-center justify-between mt-2">
