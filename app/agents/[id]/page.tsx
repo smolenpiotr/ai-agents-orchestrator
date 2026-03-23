@@ -197,6 +197,166 @@ function formatRelativeTime(ms: number): string {
   return isPast ? `${d}d ago` : `in ${d}d`;
 }
 
+/** Parse a cron expression and estimate how many times it runs per month (~30 days). */
+function estimateMonthlyRuns(cronExpr: string): number {
+  if (!cronExpr) return 0;
+  const parts = cronExpr.trim().split(/\s+/);
+  if (parts.length < 5) return 0;
+  const [minute, hour, dom, month, dow] = parts;
+
+  // Count field occurrences per unit
+  function countField(field: string, min: number, max: number): number {
+    if (field === "*") return max - min + 1;
+    if (field.startsWith("*/")) {
+      const step = parseInt(field.slice(2), 10);
+      if (!step) return 1;
+      return Math.floor((max - min) / step) + 1;
+    }
+    if (field.includes(",")) return field.split(",").length;
+    if (field.includes("-")) {
+      const [a, b] = field.split("-").map(Number);
+      return b - a + 1;
+    }
+    return 1; // specific value
+  }
+
+  const minutesPerHour = countField(minute, 0, 59);
+  const hoursPerDay = countField(hour, 0, 23);
+
+  // Days per month: if dow is restricted, estimate ~4.3 weeks * days/week
+  let daysPerMonth: number;
+  if (dom !== "*" && dow === "*") {
+    daysPerMonth = countField(dom, 1, 31);
+  } else if (dom === "*" && dow !== "*") {
+    const daysPerWeek = countField(dow, 0, 6);
+    daysPerMonth = Math.round(daysPerWeek * 4.33);
+  } else {
+    daysPerMonth = 30;
+  }
+
+  // Month multiplier (usually * = all months)
+  const monthsPerYear = countField(month, 1, 12);
+  const monthFraction = monthsPerYear / 12;
+
+  return Math.round(minutesPerHour * hoursPerDay * daysPerMonth * monthFraction);
+}
+
+/** Return a model's cost per token in USD. */
+function modelCostPer1M(model: string): { input: number; output: number } {
+  const m = model.toLowerCase();
+  if (m.includes("haiku")) return { input: 0.80, output: 4.0 };
+  if (m.includes("sonnet")) return { input: 3.0, output: 15.0 };
+  return { input: 3.0, output: 15.0 }; // default
+}
+
+/** Estimate monthly cost string for a cron job. */
+function estimateMonthlyCost(cronExpr: string, model: string): string {
+  const runs = estimateMonthlyRuns(cronExpr);
+  if (runs === 0) return "~€0/month";
+  const pricing = modelCostPer1M(model);
+  const AVG_INPUT = 500;
+  const AVG_OUTPUT = 200;
+  const costUsd = runs * ((AVG_INPUT / 1_000_000) * pricing.input + (AVG_OUTPUT / 1_000_000) * pricing.output);
+  const costEur = costUsd * 0.92;
+  if (costEur < 0.01) return "~€0.01/month";
+  return `~€${costEur.toFixed(2)}/month`;
+}
+
+/** Return Tailwind classes for model badge. */
+function modelBadgeClass(model: string): string {
+  const m = model.toLowerCase();
+  if (m.includes("haiku")) return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400";
+  if (m.includes("sonnet")) return "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400";
+  return "bg-muted text-muted-foreground";
+}
+
+function HeartbeatCard({ jobs }: { jobs: CronJob[] }) {
+  // Try to find a heartbeat job from the list
+  const heartbeatJob = jobs.find((j) =>
+    (j.name ?? "").toLowerCase().includes("heartbeat") ||
+    (j.name ?? "").toLowerCase().includes("inbox check")
+  );
+
+  const { data: heartbeatContent } = useQuery({
+    queryKey: ["file", "HEARTBEAT"],
+    queryFn: async () => {
+      const res = await fetch("/api/files?name=HEARTBEAT", { cache: "no-store" });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.content as string | null;
+    },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Extract action lines from HEARTBEAT.md (lines starting with - or *)
+  const actions = heartbeatContent
+    ? heartbeatContent
+        .split("\n")
+        .filter((l) => l.trim().startsWith("-") || l.trim().startsWith("*"))
+        .map((l) => l.trim().replace(/^[-*]\s*/, ""))
+        .filter(Boolean)
+        .slice(0, 8)
+    : [];
+
+  const lastMs = heartbeatJob?.state?.lastRunAtMs;
+  const isActive = heartbeatJob ? (heartbeatJob.enabled !== false && heartbeatJob.active !== false) : true;
+
+  return (
+    <div className="p-3 md:p-4 bg-gradient-to-br from-primary/5 to-primary/10 border-2 border-primary/30 rounded-xl space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-lg bg-primary/15 flex items-center justify-center">
+            <Zap className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Heartbeat</p>
+            <p className="text-xs text-muted-foreground">OpenClaw periodic check</p>
+          </div>
+        </div>
+        <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium shrink-0", isActive ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" : "bg-muted text-muted-foreground")}>
+          {isActive ? "active" : "inactive"}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="space-y-0.5">
+          <p className="text-muted-foreground">Model</p>
+          <span className="inline-block px-2 py-0.5 rounded-full font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+            claude-haiku-3-5
+          </span>
+        </div>
+        <div className="space-y-0.5">
+          <p className="text-muted-foreground">Frequency</p>
+          <p className="font-medium text-foreground">every 15 minutes</p>
+        </div>
+        <div className="space-y-0.5">
+          <p className="text-muted-foreground">Last run</p>
+          <p className="font-medium text-foreground">{lastMs ? formatRelativeTime(lastMs) : "—"}</p>
+        </div>
+        <div className="space-y-0.5">
+          <p className="text-muted-foreground">Est. cost</p>
+          <p className="font-medium text-foreground">{estimateMonthlyCost("*/15 * * * *", "claude-haiku-3-5")}</p>
+        </div>
+      </div>
+
+      {actions.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Actions</p>
+          <ul className="space-y-1">
+            {actions.map((action, i) => (
+              <li key={i} className="flex items-start gap-1.5 text-xs text-foreground/80">
+                <span className="text-primary mt-0.5 shrink-0">▸</span>
+                <span>{action}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function JobsTab() {
   const { data: jobsData, isLoading, error, refetch } = useQuery({
     queryKey: ["jobs"],
@@ -221,63 +381,79 @@ function JobsTab() {
     return <div className="p-3 md:p-6 text-muted-foreground text-sm">Failed to load cron jobs.</div>;
   }
 
-  const jobs: CronJob[] = jobsData?.jobs ?? [];
-
-  if (jobs.length === 0) {
-    return (
-      <div className="p-3 md:p-6">
-        <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground bg-muted/30 rounded-lg border border-dashed border-border">
-          <Clock className="h-8 w-8 opacity-40" />
-          <p className="text-sm font-medium">No cron jobs found</p>
-          <button onClick={() => refetch()} className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border border-border hover:bg-muted transition-colors">
-            <RefreshCw className="h-3 w-3" /> Refresh
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const allJobs: CronJob[] = jobsData?.jobs ?? [];
+  // Separate heartbeat jobs from regular cron jobs
+  const regularJobs = allJobs.filter((j) =>
+    !(j.name ?? "").toLowerCase().includes("heartbeat") &&
+    !(j.name ?? "").toLowerCase().includes("inbox check")
+  );
 
   return (
     <div className="p-3 md:p-6 space-y-3">
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-xs text-muted-foreground">{jobs.length} job{jobs.length !== 1 ? "s" : ""} from OpenClaw</p>
+      {/* Heartbeat section — always pinned at top */}
+      <HeartbeatCard jobs={allJobs} />
+
+      {/* Regular cron jobs header */}
+      <div className="flex items-center justify-between mt-2">
+        <p className="text-xs text-muted-foreground">{regularJobs.length} cron job{regularJobs.length !== 1 ? "s" : ""} from OpenClaw</p>
         <button onClick={() => refetch()} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
           <RefreshCw className="h-3 w-3" /> Refresh
         </button>
       </div>
-      {jobs.map((job) => {
-        const isActive = job.enabled !== false && job.active !== false;
-        const scheduleExpr = typeof job.schedule === "object" ? job.schedule?.expr : job.schedule;
-        const scheduleTz = typeof job.schedule === "object" ? job.schedule?.tz : undefined;
-        const model = job.payload?.model ?? "default";
-        const modelShort = model === "default" ? "default" : model.split("/").pop()?.replace("anthropic/","") ?? model;
-        const nextMs = job.state?.nextRunAtMs;
-        const lastMs = job.state?.lastRunAtMs;
-        const lastStatus = job.state?.lastRunStatus ?? job.status;
-        return (
-          <div key={job.id} className="p-3 md:p-4 bg-card border border-border rounded-lg space-y-2">
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-sm font-medium leading-tight">{job.name || `Job ${job.id.slice(0, 8)}`}</p>
-              <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium shrink-0", isActive ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" : "bg-muted text-muted-foreground")}>
-                {isActive ? "active" : "inactive"}
-              </span>
-            </div>
-            {scheduleExpr && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Clock className="h-3 w-3 shrink-0" />
-                <span className="font-mono">{scheduleExpr}</span>
-                {scheduleTz && <span className="opacity-60">({scheduleTz})</span>}
+
+      {regularJobs.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground bg-muted/30 rounded-lg border border-dashed border-border">
+          <Clock className="h-8 w-8 opacity-40" />
+          <p className="text-sm font-medium">No cron jobs found</p>
+        </div>
+      ) : (
+        regularJobs.map((job) => {
+          const isActive = job.enabled !== false && job.active !== false;
+          const scheduleExpr = typeof job.schedule === "object" ? job.schedule?.expr : job.schedule;
+          const scheduleTz = typeof job.schedule === "object" ? job.schedule?.tz : undefined;
+          const model = job.payload?.model ?? "default";
+          const modelShort = model === "default" ? "default" : model.split("/").pop()?.replace("anthropic/", "") ?? model;
+          const nextMs = job.state?.nextRunAtMs;
+          const lastMs = job.state?.lastRunAtMs;
+          const lastStatus = job.state?.lastRunStatus ?? job.status;
+          const monthlyCost = scheduleExpr ? estimateMonthlyCost(scheduleExpr, model) : null;
+
+          return (
+            <div key={job.id} className="p-3 md:p-4 bg-card border border-border rounded-lg space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-medium leading-tight">{job.name || `Job ${job.id.slice(0, 8)}`}</p>
+                <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium shrink-0", isActive ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" : "bg-muted text-muted-foreground")}>
+                  {isActive ? "active" : "inactive"}
+                </span>
               </div>
-            )}
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              {nextMs && <span>Next: <span className="text-foreground font-medium">{formatRelativeTime(nextMs)}</span></span>}
-              {lastMs && <span>Last: <span className="text-foreground">{formatRelativeTime(lastMs)}</span>{lastStatus && <span className={cn("ml-1", lastStatus === "ok" ? "text-green-500" : "text-red-500")}>({lastStatus})</span>}</span>}
-              <span>Model: <span className={cn("font-mono", model === "default" ? "text-muted-foreground" : "text-primary")}>{modelShort}</span></span>
-              {(job.sessionTarget ?? job.target) && <span>Target: <span className="text-foreground">{job.sessionTarget ?? job.target}</span></span>}
+              {scheduleExpr && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Clock className="h-3 w-3 shrink-0" />
+                  <span className="font-mono">{scheduleExpr}</span>
+                  {scheduleTz && <span className="opacity-60">({scheduleTz})</span>}
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Model badge */}
+                <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", modelBadgeClass(model))}>
+                  {modelShort}
+                </span>
+                {/* Cost estimate badge */}
+                {monthlyCost && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium">
+                    {monthlyCost}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {nextMs && <span>Next: <span className="text-foreground font-medium">{formatRelativeTime(nextMs)}</span></span>}
+                {lastMs && <span>Last: <span className="text-foreground">{formatRelativeTime(lastMs)}</span>{lastStatus && <span className={cn("ml-1", lastStatus === "ok" ? "text-green-500" : "text-red-500")}>({lastStatus})</span>}</span>}
+                {(job.sessionTarget ?? job.target) && <span>Target: <span className="text-foreground">{job.sessionTarget ?? job.target}</span></span>}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })
+      )}
     </div>
   );
 }
