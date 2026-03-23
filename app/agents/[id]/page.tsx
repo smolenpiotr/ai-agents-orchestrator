@@ -254,8 +254,8 @@ function estimateMonthlyCost(cronExpr: string, model: string): string {
   const runs = estimateMonthlyRuns(cronExpr);
   if (runs === 0) return "~€0/month";
   const pricing = modelCostPer1M(model);
-  const AVG_INPUT = 500;
-  const AVG_OUTPUT = 200;
+  const AVG_INPUT = 800;
+  const AVG_OUTPUT = 300;
   const costUsd = runs * ((AVG_INPUT / 1_000_000) * pricing.input + (AVG_OUTPUT / 1_000_000) * pricing.output);
   const costEur = costUsd * 0.92;
   if (costEur < 0.01) return "~€0.01/month";
