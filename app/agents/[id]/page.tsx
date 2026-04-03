@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Bot, Star, Kanban, Package, Plus, X, Search, RefreshCw, FileText, Clock,
   Zap, AlertCircle, GitBranch,
-  ArrowRight, Loader2,
+  ArrowRight, Loader2, Play, ChevronDown, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
@@ -55,6 +55,241 @@ async function fetchDirectReports(parentId: string): Promise<Agent[]> {
 }
 
 type Tab = "board" | "skills" | "files" | "jobs";
+
+// ---- Per-Agent Jobs Tab ----
+interface AgentJob {
+  id: string;
+  name: string | null;
+  schedule: string;
+  model: string | null;
+  lastRunStatus: string | null;
+  lastRun: string | null;
+  nextRun: string | null;
+  enabled: boolean;
+}
+
+function AgentJobsTab({ agentId }: { agentId: string }) {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["agentJobs", agentId],
+    queryFn: async () => {
+      const res = await fetch(`/api/agents/${agentId}/jobs`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to fetch jobs");
+      return res.json() as Promise<{ jobs: AgentJob[] }>;
+    },
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const [running, setRunning] = useState<string | null>(null);
+
+  async function handleRun(jobId: string) {
+    setRunning(jobId);
+    try {
+      const res = await fetch(`/api/agents/${agentId}/jobs/${jobId}/run`, { method: "POST" });
+      const result = await res.json();
+      if (result.ok) toast.success("Job triggered");
+      else toast.error("Failed to run job");
+    } catch {
+      toast.error("Failed to run job");
+    } finally {
+      setRunning(null);
+      refetch();
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-3 md:p-6 space-y-3">
+        {[1, 2].map((i) => <div key={i} className="h-16 bg-muted rounded-lg animate-pulse" />)}
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="p-3 md:p-6 text-muted-foreground text-sm">Failed to load jobs.</div>;
+  }
+
+  const jobs: AgentJob[] = data?.jobs ?? [];
+
+  return (
+    <div className="p-3 md:p-6 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">{jobs.length} job{jobs.length !== 1 ? "s" : ""}</p>
+        <button onClick={() => refetch()} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <RefreshCw className="h-3 w-3" /> Refresh
+        </button>
+      </div>
+
+      {jobs.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground bg-muted/30 rounded-lg border border-dashed border-border">
+          <Clock className="h-8 w-8 opacity-40" />
+          <p className="text-sm font-medium">No jobs found</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/30">
+                <th className="text-left px-3 py-2 font-medium text-muted-foreground text-xs">Name</th>
+                <th className="text-left px-3 py-2 font-medium text-muted-foreground text-xs hidden sm:table-cell">Schedule</th>
+                <th className="text-left px-3 py-2 font-medium text-muted-foreground text-xs hidden md:table-cell">Model</th>
+                <th className="text-left px-3 py-2 font-medium text-muted-foreground text-xs">Last Run</th>
+                <th className="text-left px-3 py-2 font-medium text-muted-foreground text-xs">Status</th>
+                <th className="px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {jobs.map((job) => {
+                const status = job.lastRunStatus;
+                const statusClass = status === "ok"
+                  ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                  : status === "error"
+                  ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
+                  : "bg-muted text-muted-foreground";
+                const statusLabel = status ?? "idle";
+                const modelShort = job.model ? job.model.split("/").pop()?.replace("anthropic/", "") ?? job.model : "—";
+                const lastRunLabel = job.lastRun ? formatRelativeTime(new Date(job.lastRun).getTime()) : "—";
+
+                return (
+                  <tr key={job.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                    <td className="px-3 py-2.5 font-medium text-foreground">
+                      {job.name || `Job ${job.id.slice(0, 8)}`}
+                    </td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground hidden sm:table-cell">
+                      {job.schedule || "—"}
+                    </td>
+                    <td className="px-3 py-2.5 hidden md:table-cell">
+                      {job.model ? (
+                        <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", modelBadgeClass(job.model))}>
+                          {modelShort}
+                        </span>
+                      ) : <span className="text-xs text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs text-muted-foreground">{lastRunLabel}</td>
+                    <td className="px-3 py-2.5">
+                      <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", statusClass)}>
+                        {statusLabel}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <button
+                        onClick={() => handleRun(job.id)}
+                        disabled={running === job.id}
+                        className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50"
+                      >
+                        {running === job.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+                        Run
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- Per-Agent Files Tab ----
+interface AgentFile {
+  name: string;
+  path: string;
+  content: string | null;
+  size: number;
+  exists: boolean;
+  lastModified: string | null;
+}
+
+function AgentFilesTab({ agentId }: { agentId: string }) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["agentFiles", agentId],
+    queryFn: async () => {
+      const res = await fetch(`/api/agents/${agentId}/files`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to fetch files");
+      return res.json() as Promise<{ files: AgentFile[] }>;
+    },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  function toggle(name: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-3 md:p-6 space-y-2">
+        {[1, 2, 3].map((i) => <div key={i} className="h-12 bg-muted rounded-lg animate-pulse" />)}
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="p-3 md:p-6 text-muted-foreground text-sm">Failed to load files.</div>;
+  }
+
+  const files: AgentFile[] = data?.files ?? [];
+  const existing = files.filter((f) => f.exists);
+  const missing = files.filter((f) => !f.exists);
+
+  return (
+    <div className="p-3 md:p-6 space-y-2">
+      {existing.length === 0 && (
+        <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground bg-muted/30 rounded-lg border border-dashed border-border">
+          <FileText className="h-8 w-8 opacity-40" />
+          <p className="text-sm font-medium">No files found</p>
+        </div>
+      )}
+      {existing.map((file) => {
+        const open = expanded.has(file.name);
+        return (
+          <div key={file.name} className="bg-card border border-border rounded-lg overflow-hidden">
+            <button
+              onClick={() => toggle(file.name)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors text-left"
+            >
+              <div className="flex items-center gap-2">
+                {open ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+                <FileText className="h-4 w-4 text-primary shrink-0" />
+                <span className="font-medium text-sm">{file.name}</span>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                {file.size > 0 && <span>{(file.size / 1024).toFixed(1)} KB</span>}
+                {file.lastModified && <span className="hidden sm:inline">{new Date(file.lastModified).toLocaleDateString()}</span>}
+              </div>
+            </button>
+            {open && (
+              <div className="border-t border-border">
+                <pre className="p-4 text-xs font-mono whitespace-pre-wrap break-words bg-muted/20 max-h-[500px] overflow-auto text-foreground/80">
+                  {file.content ?? ""}
+                </pre>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {missing.length > 0 && (
+        <div className="pt-2">
+          <p className="text-xs text-muted-foreground mb-1">Missing files:</p>
+          <div className="flex flex-wrap gap-1.5">
+            {missing.map((f) => (
+              <span key={f.name} className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground font-mono">{f.name}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ---- Files Tab Component ----
 function FilesTab() {
@@ -729,30 +964,26 @@ export default function AgentDetailPage() {
               )}
             </button>
           ))}
-          {isMain && (
-            <button
-              onClick={() => setActiveTab("files")}
-              className={cn(
-                "flex items-center gap-1.5 px-3 md:px-4 py-2 text-sm rounded-t-lg border border-b-0 transition-colors whitespace-nowrap min-h-[44px]",
-                activeTab === "files" ? "bg-background border-border text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <FileText className="h-4 w-4" />
-              Files
-            </button>
-          )}
-          {isMain && (
-            <button
-              onClick={() => setActiveTab("jobs")}
-              className={cn(
-                "flex items-center gap-1.5 px-3 md:px-4 py-2 text-sm rounded-t-lg border border-b-0 transition-colors whitespace-nowrap min-h-[44px]",
-                activeTab === "jobs" ? "bg-background border-border text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Clock className="h-4 w-4" />
-              Jobs
-            </button>
-          )}
+          <button
+            onClick={() => setActiveTab("jobs")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 md:px-4 py-2 text-sm rounded-t-lg border border-b-0 transition-colors whitespace-nowrap min-h-[44px]",
+              activeTab === "jobs" ? "bg-background border-border text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Clock className="h-4 w-4" />
+            Jobs
+          </button>
+          <button
+            onClick={() => setActiveTab("files")}
+            className={cn(
+              "flex items-center gap-1.5 px-3 md:px-4 py-2 text-sm rounded-t-lg border border-b-0 transition-colors whitespace-nowrap min-h-[44px]",
+              activeTab === "files" ? "bg-background border-border text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <FileText className="h-4 w-4" />
+            Files
+          </button>
         </div>
       </div>
 
@@ -904,7 +1135,9 @@ export default function AgentDetailPage() {
         )}
 
         {activeTab === "files" && isMain && <FilesTab />}
+        {activeTab === "files" && !isMain && <AgentFilesTab agentId={id} />}
         {activeTab === "jobs" && isMain && <JobsTab />}
+        {activeTab === "jobs" && !isMain && <AgentJobsTab agentId={id} />}
       </div>
 
       {skillsBrowserOpen && <SkillsBrowser open={skillsBrowserOpen} onClose={() => setSkillsBrowserOpen(false)} />}
