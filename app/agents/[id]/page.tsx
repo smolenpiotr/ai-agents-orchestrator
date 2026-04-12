@@ -66,6 +66,15 @@ interface AgentJob {
   lastRun: string | null;
   nextRun: string | null;
   enabled: boolean;
+  actionTracking?: {
+    deliveredAction: boolean;
+    actionType: string | null;
+    actionCount: number;
+    summary: string | null;
+    lastActionAt: string | null;
+    deliveredActions7d: number | null;
+    runs7d: number | null;
+  };
 }
 
 function AgentJobsTab({ agentId }: { agentId: string }) {
@@ -135,6 +144,7 @@ function AgentJobsTab({ agentId }: { agentId: string }) {
                 <th className="text-left px-3 py-2 font-medium text-muted-foreground text-xs hidden md:table-cell">Model</th>
                 <th className="text-left px-3 py-2 font-medium text-muted-foreground text-xs">Last Run</th>
                 <th className="text-left px-3 py-2 font-medium text-muted-foreground text-xs">Status</th>
+                <th className="text-left px-3 py-2 font-medium text-muted-foreground text-xs hidden lg:table-cell">Action</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
@@ -149,6 +159,17 @@ function AgentJobsTab({ agentId }: { agentId: string }) {
                 const statusLabel = status ?? "idle";
                 const modelShort = job.model ? job.model.split("/").pop()?.replace("anthropic/", "") ?? job.model : "—";
                 const lastRunLabel = job.lastRun ? formatRelativeTime(new Date(job.lastRun).getTime()) : "—";
+                const actionTracking = job.actionTracking;
+                const actionClass = actionTracking?.deliveredAction
+                  ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
+                  : "bg-muted text-muted-foreground";
+                const actionLabel = actionTracking?.deliveredAction
+                  ? actionTracking.actionType?.replaceAll("_", " ") ?? "action"
+                  : "no action";
+                const actionDetail = actionTracking?.summary
+                  ?? (actionTracking?.deliveredActions7d != null && actionTracking?.runs7d != null
+                    ? `${actionTracking.deliveredActions7d}/${actionTracking.runs7d} active in 7d`
+                    : null);
 
                 return (
                   <tr key={job.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
@@ -170,6 +191,18 @@ function AgentJobsTab({ agentId }: { agentId: string }) {
                       <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", statusClass)}>
                         {statusLabel}
                       </span>
+                    </td>
+                    <td className="px-3 py-2.5 hidden lg:table-cell">
+                      <div className="space-y-1">
+                        <span className={cn("inline-flex text-xs px-2 py-0.5 rounded-full font-medium", actionClass)}>
+                          {actionLabel}
+                        </span>
+                        {actionDetail && (
+                          <p className="text-[11px] text-muted-foreground max-w-[220px] truncate" title={actionDetail}>
+                            {actionDetail}
+                          </p>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       <button
