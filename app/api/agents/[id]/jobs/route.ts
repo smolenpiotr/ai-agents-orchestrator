@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { prisma } from "@/lib/prisma";
+import { getJobActionTracking } from "@/lib/job-action-tracking";
 
 const execAsync = promisify(exec);
 
@@ -40,6 +41,7 @@ export async function GET(
         lastRun: state?.lastRunAtMs ? new Date(state.lastRunAtMs).toISOString() : null,
         nextRun: state?.nextRunAtMs ? new Date(state.nextRunAtMs).toISOString() : null,
         enabled: (j.enabled as boolean) !== false,
+        actionTracking: getJobActionTracking(j),
       };
     });
 
